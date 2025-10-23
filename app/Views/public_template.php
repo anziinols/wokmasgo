@@ -7,7 +7,7 @@
     <title><?= $page_title ?? 'WOKMASGO' ?></title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="<?= base_url('assets/images/favicon.ico') ?>">
+    <link rel="icon" type="image/x-icon" href="<?= base_url('assets/images/wokmasgo_favicon.ico') ?>">
     
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
