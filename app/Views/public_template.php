@@ -268,7 +268,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; <?= date('Y') ?> WOKMASGO. All rights reserved.</p>
+                <p>&copy; <?= date('Y') ?> WOKMASGO. All rights reserved. | Developed by Dakoii Systems</p>
             </div>
         </div>
     </footer>
