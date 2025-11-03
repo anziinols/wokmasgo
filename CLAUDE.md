@@ -165,12 +165,13 @@ To add a new app to WOKMASGO:
 
 **API Integration**: Uses OpenRouter API with Google Gemini 2.5 Flash Image model
 
-**Important**: The API key is currently hardcoded in `app/Views/image_creator_scripts.php:318`. When modifying:
-```javascript
-'Authorization': 'Bearer sk-or-v1-...'  // API key location
-```
+**Security**: The API key is securely stored in the `.env` file and accessed via backend endpoint:
+- API key stored in: `.env` file as `openrouter.apiKey`
+- Backend endpoint: `ImageCreator::generate()` method handles all API calls
+- Frontend calls: `POST /image-creator/generate` (API key never exposed to client)
+- The `.env` file is in `.gitignore` to prevent accidental commits
 
-**API Request Structure**:
+**API Request Structure** (handled by backend):
 ```javascript
 {
     model: "google/gemini-2.5-flash-image",
