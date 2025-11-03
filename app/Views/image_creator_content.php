@@ -42,6 +42,9 @@
         <!-- Image Generation Form -->
         <div class="card shadow-lg" id="generationForm" style="display: none;">
             <div class="card-body">
+                <!-- CSRF Token for API calls -->
+                <input type="hidden" name="<?= csrf_token() ?>" value="<?= csrf_hash() ?>">
+
                 <h3 class="card-title mb-4">
                     <i class="fas fa-magic me-2"></i>
                     Generate <span id="selectedTypeName">Image</span>

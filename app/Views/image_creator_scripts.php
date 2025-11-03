@@ -526,24 +526,34 @@ async function callGeminiNanoBanana(prompt) {
             }
         };
 
-        // Make API call to OpenRouter
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        // Get CSRF token
+        const csrfToken = document.querySelector('input[name="<?= csrf_token() ?>"]').value;
+
+        // Make API call to backend endpoint (keeps API key secure)
+        const response = await fetch('<?= base_url('image-creator/generate') ?>', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer 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',
-                'HTTP-Referer': window.location.href,
-                'X-Title': 'WOKMASGO Image Creator'
+                'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({
+                ...requestBody,
+                '<?= csrf_token() ?>': csrfToken
+            })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`API request failed: ${response.statusText}. ${JSON.stringify(errorData)}`);
+        const responseData = await response.json();
+
+        // Update CSRF token
+        if (responseData.csrf_token) {
+            document.querySelector('input[name="<?= csrf_token() ?>"]').value = responseData.csrf_token;
         }
 
-        const data = await response.json();
+        if (!responseData.success) {
+            throw new Error(responseData.error || 'API request failed');
+        }
+
+        const data = responseData.data;
         console.log('API Response:', data);
 
         // Extract the generated image from the response
