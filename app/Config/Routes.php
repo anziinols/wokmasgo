@@ -11,6 +11,9 @@ $routes->get('/', 'Landing::index');
 // Markdown Viewer route (client-side processing)
 $routes->get('markdown-viewer', 'MarkdownViewer::index');
 
+// Image Creator route (AI-powered image generation)
+$routes->get('image-creator', 'ImageCreator::index');
+
 // Future app routes (uncomment when ready to use)
 // $routes->get('dashboard', 'Dashboard::index');
 // $routes->get('users', 'Users::index');

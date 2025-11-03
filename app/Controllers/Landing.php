@@ -52,6 +52,15 @@ class Landing extends BaseController
                 'color' => 'maroon',
                 'gradient' => 'gradient-maroon-gold'
             ],
+            [
+                'id' => 2,
+                'name' => 'Image Creator',
+                'description' => 'Create AI-powered logos and advertisement flyers',
+                'icon' => 'fas fa-image',
+                'url' => base_url('image-creator'),
+                'color' => 'gold',
+                'gradient' => 'gradient-gold-maroon'
+            ],
         ];
     }
 }
