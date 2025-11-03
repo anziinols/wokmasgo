@@ -14,12 +14,19 @@ class ImageCreator extends BaseController
      */
     public function index(): string
     {
+        // Prepare data for views
+        $viewData = [
+            'csrf_token_name' => csrf_token(),
+            'csrf_hash' => csrf_hash(),
+            'base_url' => base_url()
+        ];
+
         // Load the image creator content view
-        $mainContent = view('image_creator_content');
+        $mainContent = view('image_creator_content', $viewData);
 
         // Load additional CSS and JS
-        $additionalCss = view('image_creator_styles');
-        $scriptContent = view('image_creator_scripts');
+        $additionalCss = view('image_creator_styles', $viewData);
+        $scriptContent = view('image_creator_scripts', $viewData);
 
         // Add cache busting comment to force reload
         $additionalJs = '<script>// Version: ' . time() . "\n" . $scriptContent . '</script>';

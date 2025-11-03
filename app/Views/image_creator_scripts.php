@@ -527,10 +527,11 @@ async function callGeminiNanoBanana(prompt) {
         };
 
         // Get CSRF token
-        const csrfToken = document.querySelector('input[name="<?= csrf_token() ?>"]').value;
+        const csrfTokenName = '<?= csrf_token() ?>';
+        const csrfToken = document.querySelector('input[name="' + csrfTokenName + '"]').value;
 
         // Make API call to backend endpoint (keeps API key secure)
-        const response = await fetch('<?= base_url('image-creator/generate') ?>', {
+        const response = await fetch('<?= base_url("image-creator/generate") ?>', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -538,7 +539,7 @@ async function callGeminiNanoBanana(prompt) {
             },
             body: JSON.stringify({
                 ...requestBody,
-                '<?= csrf_token() ?>': csrfToken
+                [csrfTokenName]: csrfToken
             })
         });
 
@@ -546,7 +547,7 @@ async function callGeminiNanoBanana(prompt) {
 
         // Update CSRF token
         if (responseData.csrf_token) {
-            document.querySelector('input[name="<?= csrf_token() ?>"]').value = responseData.csrf_token;
+            document.querySelector('input[name="' + csrfTokenName + '"]').value = responseData.csrf_token;
         }
 
         if (!responseData.success) {
