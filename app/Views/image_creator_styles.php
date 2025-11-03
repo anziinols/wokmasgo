@@ -228,6 +228,101 @@
     font-size: 0.8rem;
 }
 
+/* Base Image Previews (for edit mode with multiple images) */
+.base-image-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.base-image-preview-item {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.base-image-preview-item.primary {
+    border: 3px solid var(--gold);
+    box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+}
+
+.base-image-preview-item img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.base-image-preview-item .remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.9;
+    z-index: 2;
+}
+
+.base-image-preview-item .remove-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.base-image-preview-item .primary-star {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 35px;
+    height: 35px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+
+.base-image-preview-item .primary-star:hover {
+    background: rgba(0, 0, 0, 0.8);
+    transform: scale(1.1);
+}
+
+.base-image-preview-item .primary-star i {
+    font-size: 18px;
+    color: #ccc;
+    transition: color 0.3s ease;
+}
+
+.base-image-preview-item.primary .primary-star i {
+    color: var(--gold);
+}
+
+.base-image-preview-item .image-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    color: white;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.base-image-preview-item.primary .image-label {
+    background: linear-gradient(to top, var(--maroon), transparent);
+}
+
 /* Form Controls */
 .form-label {
     color: var(--maroon);

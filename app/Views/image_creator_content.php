@@ -82,21 +82,20 @@
                 <div class="mb-4" id="baseImageSection" style="display: none;">
                     <label class="form-label fw-bold">
                         <i class="fas fa-file-upload me-2"></i>
-                        Upload Image to Edit <span class="text-danger">*</span>
+                        Upload Images to Edit <span class="text-danger">*</span>
                     </label>
+                    <div class="form-text mb-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Upload multiple images. Click the star <i class="fas fa-star text-warning"></i> to set the primary image to edit. Other images can be inserted into the primary image.
+                    </div>
                     <div class="upload-area" id="baseImageUploadArea">
-                        <input type="file" id="baseImageInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" class="d-none">
+                        <input type="file" id="baseImageInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" multiple class="d-none">
                         <div class="upload-placeholder" onclick="document.getElementById('baseImageInput').click()">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
-                            <p class="mb-0">Click to upload image or drag and drop</p>
-                            <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB)</small>
+                            <p class="mb-0">Click to upload images or drag and drop</p>
+                            <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB each, Multiple files)</small>
                         </div>
-                        <div class="template-preview" id="baseImagePreview" style="display: none;">
-                            <img id="baseImagePreviewImg" src="" alt="Base Image Preview">
-                            <button type="button" class="btn btn-sm btn-danger remove-btn" onclick="removeBaseImage()">
-                                <i class="fas fa-times"></i> Remove
-                            </button>
-                        </div>
+                        <div class="base-image-previews" id="baseImagePreviews"></div>
                     </div>
                 </div>
 

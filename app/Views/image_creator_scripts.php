@@ -3,7 +3,8 @@ let selectedType = '';
 let selectedMode = ''; // 'create' or 'edit' for flyers
 let templateFile = null;
 let productFiles = [];
-let baseImageFile = null; // For image editing
+let baseImageFiles = []; // For image editing - multiple images
+let primaryImageIndex = 0; // Index of the primary image to edit
 
 /**
  * Validate if file is a supported image format
@@ -201,27 +202,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Base image upload (for edit mode)
+    // Base image upload (for edit mode) - supports multiple images
     const baseImageInput = document.getElementById('baseImageInput');
     const baseImageUploadArea = document.getElementById('baseImageUploadArea');
 
     if (baseImageInput) {
         baseImageInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file && isValidImageFile(file)) {
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB');
-                    return;
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                if (isValidImageFile(file)) {
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB: ' + file.name);
+                        return;
+                    }
+                    baseImageFiles.push(file);
+                } else {
+                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
                 }
-                baseImageFile = file;
-                displayBaseImagePreview(file);
-            } else if (file) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
-            }
+            });
+            displayBaseImagePreviews();
         });
     }
 
-    // Drag and drop for base image
+    // Drag and drop for base images
     if (baseImageUploadArea) {
         baseImageUploadArea.addEventListener('dragover', function(e) {
             e.preventDefault();
@@ -236,17 +239,19 @@ document.addEventListener('DOMContentLoaded', function() {
         baseImageUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
-            const file = e.dataTransfer.files[0];
-            if (file && isValidImageFile(file)) {
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB');
-                    return;
+            const files = Array.from(e.dataTransfer.files);
+            files.forEach(file => {
+                if (isValidImageFile(file)) {
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB: ' + file.name);
+                        return;
+                    }
+                    baseImageFiles.push(file);
+                } else {
+                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
                 }
-                baseImageFile = file;
-                displayBaseImagePreview(file);
-            } else if (file) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
-            }
+            });
+            displayBaseImagePreviews();
         });
     }
 });
@@ -275,28 +280,62 @@ function removeTemplate() {
 }
 
 /**
- * Display base image preview (for edit mode)
+ * Display base image previews (for edit mode with multiple images)
  */
-function displayBaseImagePreview(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const uploadArea = document.getElementById('baseImageUploadArea');
-        uploadArea.querySelector('.upload-placeholder').style.display = 'none';
-        document.getElementById('baseImagePreview').style.display = 'block';
-        document.getElementById('baseImagePreviewImg').src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+function displayBaseImagePreviews() {
+    const container = document.getElementById('baseImagePreviews');
+    container.innerHTML = '';
+
+    baseImageFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const div = document.createElement('div');
+            div.className = 'base-image-preview-item' + (index === primaryImageIndex ? ' primary' : '');
+            div.innerHTML = `
+                <img src="${e.target.result}" alt="Image ${index + 1}">
+                <div class="primary-star" onclick="setPrimaryImage(${index})" title="Set as primary image">
+                    <i class="fas fa-star"></i>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger remove-btn" onclick="removeBaseImage(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="image-label">
+                    ${index === primaryImageIndex ? 'Primary Image' : 'Associated Image'}
+                </div>
+            `;
+            container.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Set primary image for editing
+ */
+function setPrimaryImage(index) {
+    primaryImageIndex = index;
+    displayBaseImagePreviews();
 }
 
 /**
  * Remove base image
  */
-function removeBaseImage() {
-    baseImageFile = null;
-    document.getElementById('baseImageInput').value = '';
-    const uploadArea = document.getElementById('baseImageUploadArea');
-    uploadArea.querySelector('.upload-placeholder').style.display = 'block';
-    document.getElementById('baseImagePreview').style.display = 'none';
+function removeBaseImage(index) {
+    baseImageFiles.splice(index, 1);
+
+    // Adjust primary index if needed
+    if (primaryImageIndex >= baseImageFiles.length && baseImageFiles.length > 0) {
+        primaryImageIndex = baseImageFiles.length - 1;
+    } else if (baseImageFiles.length === 0) {
+        primaryImageIndex = 0;
+    } else if (index < primaryImageIndex) {
+        primaryImageIndex--;
+    } else if (index === primaryImageIndex && baseImageFiles.length > 0) {
+        // If we removed the primary image, set the first one as primary
+        primaryImageIndex = 0;
+    }
+
+    displayBaseImagePreviews();
 }
 
 /**
@@ -349,8 +388,8 @@ async function generateImage() {
 
     // Validation for edit mode
     if (selectedType === 'flyer' && selectedMode === 'edit') {
-        if (!baseImageFile) {
-            alert('Please upload an image to edit.');
+        if (baseImageFiles.length === 0) {
+            alert('Please upload at least one image to edit.');
             return;
         }
     }
@@ -391,7 +430,13 @@ function buildCompletePrompt(userPrompt) {
     } else if (selectedType === 'flyer') {
         if (selectedMode === 'edit') {
             // Edit mode: modify existing image
-            completePrompt = `Using the provided image, ${userPrompt}. Keep the rest of the image elements that are not mentioned unchanged, preserving the original style, lighting, and composition.`;
+            completePrompt = `Using the provided primary image, ${userPrompt}. Keep the rest of the image elements that are not mentioned unchanged, preserving the original style, lighting, and composition.`;
+
+            // Mention associated images if any
+            const associatedCount = baseImageFiles.length - 1;
+            if (associatedCount > 0) {
+                completePrompt += ` I have also provided ${associatedCount} additional image${associatedCount > 1 ? 's' : ''} that you can use to insert elements into the primary image as needed.`;
+            }
         } else {
             // Create mode: generate new flyer
             completePrompt = `Create an advertisement flyer. ${userPrompt}`;
@@ -458,7 +503,8 @@ async function fileToBase64(file) {
 async function callGeminiNanoBanana(prompt) {
     console.log('Calling OpenRouter/Gemini Nano Banana API with prompt:', prompt);
     console.log('Mode:', selectedMode);
-    console.log('Base image file:', baseImageFile);
+    console.log('Base image files:', baseImageFiles);
+    console.log('Primary image index:', primaryImageIndex);
     console.log('Template file:', templateFile);
     console.log('Product files:', productFiles);
 
@@ -470,15 +516,29 @@ async function callGeminiNanoBanana(prompt) {
         // Build the message content array
         let contentParts = [];
 
-        // For edit mode, include the base image first
-        if (selectedMode === 'edit' && baseImageFile) {
-            const baseImageBase64 = await fileToBase64(baseImageFile);
+        // For edit mode, include the primary base image first, then associated images
+        if (selectedMode === 'edit' && baseImageFiles.length > 0) {
+            // Add primary image first
+            const primaryImageBase64 = await fileToBase64(baseImageFiles[primaryImageIndex]);
             contentParts.push({
                 type: "image_url",
                 image_url: {
-                    url: baseImageBase64
+                    url: primaryImageBase64
                 }
             });
+
+            // Add associated images (all images except the primary one)
+            for (let i = 0; i < baseImageFiles.length; i++) {
+                if (i !== primaryImageIndex) {
+                    const associatedImageBase64 = await fileToBase64(baseImageFiles[i]);
+                    contentParts.push({
+                        type: "image_url",
+                        image_url: {
+                            url: associatedImageBase64
+                        }
+                    });
+                }
+            }
         }
 
         // For create mode with template, include template image
@@ -605,7 +665,8 @@ function resetForm() {
     document.getElementById('promptInput').value = '';
     templateFile = null;
     productFiles = [];
-    baseImageFile = null;
+    baseImageFiles = [];
+    primaryImageIndex = 0;
 
     // Reset file inputs
     document.getElementById('templateInput').value = '';
@@ -628,13 +689,9 @@ function resetForm() {
         document.getElementById('productPreviews').innerHTML = '';
     }
 
-    // Reset base image preview
-    const baseImageUploadArea = document.getElementById('baseImageUploadArea');
-    if (baseImageUploadArea && baseImageUploadArea.querySelector('.upload-placeholder')) {
-        baseImageUploadArea.querySelector('.upload-placeholder').style.display = 'block';
-    }
-    if (document.getElementById('baseImagePreview')) {
-        document.getElementById('baseImagePreview').style.display = 'none';
+    // Reset base image previews
+    if (document.getElementById('baseImagePreviews')) {
+        document.getElementById('baseImagePreviews').innerHTML = '';
     }
 
     // Hide result
