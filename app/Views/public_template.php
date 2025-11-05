@@ -268,7 +268,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; <?= date('Y') ?> WOKMASGO. All rights reserved.</p>
+                <p>Copyright @ 2025 dk</p>
             </div>
         </div>
     </footer>
