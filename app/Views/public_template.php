@@ -268,7 +268,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>Copyright @ 2025 dk</p>
+                <p>Copyright @ <?= date('Y') ?> dk</p>
             </div>
         </div>
     </footer>
