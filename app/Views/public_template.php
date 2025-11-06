@@ -256,9 +256,9 @@
                     <span>WOKMASGO</span>
                 </div>
                 <div class="footer-links">
-                    <a href="<?= base_url('privacy') ?>">Privacy Policy</a>
-                    <a href="<?= base_url('terms') ?>">Terms of Service</a>
-                    <a href="<?= base_url('help') ?>">Help</a>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Help</a>
                 </div>
                 <div class="footer-social">
                     <a href="#" title="Facebook"><i class="fab fa-facebook"></i></a>
