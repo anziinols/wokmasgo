@@ -134,6 +134,12 @@
                             <p class="mb-0">Tap to upload product images or drag and drop</p>
                             <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB each)</small>
                         </label>
+                    </div>
+                    <!-- Separate container for product image previews -->
+                    <div class="product-previews-container" id="productPreviewsContainer" style="display: none;">
+                        <div class="product-previews-header">
+                            <span class="fw-bold"><i class="fas fa-th me-2"></i>Uploaded Products (<span id="productCount">0</span>)</span>
+                        </div>
                         <div class="product-previews" id="productPreviews"></div>
                     </div>
                 </div>

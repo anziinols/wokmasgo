@@ -423,16 +423,26 @@ function removeBaseImage(index) {
 
 /**
  * Display product image previews - Mobile compatible
+ * Previews are shown in a separate container below the upload zone
  */
 function displayProductPreviews() {
     const container = document.getElementById('productPreviews');
+    const previewsContainer = document.getElementById('productPreviewsContainer');
+    const productCountSpan = document.getElementById('productCount');
+
     if (!container) return;
 
     container.innerHTML = '';
 
+    // Show/hide the preview container based on whether there are files
     if (productFiles.length === 0) {
+        if (previewsContainer) previewsContainer.style.display = 'none';
         return;
     }
+
+    // Show the preview container and update count
+    if (previewsContainer) previewsContainer.style.display = 'block';
+    if (productCountSpan) productCountSpan.textContent = productFiles.length;
 
     productFiles.forEach((file, index) => {
         const reader = new FileReader();
