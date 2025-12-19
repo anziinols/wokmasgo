@@ -7,11 +7,31 @@ let baseImageFiles = []; // For image editing - multiple images
 let primaryImageIndex = 0; // Index of the primary image to edit
 
 /**
+ * Detect if device is mobile
+ */
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ||
+           ('ontouchstart' in window);
+}
+
+/**
  * Validate if file is a supported image format
+ * More lenient check for mobile browsers that may report different MIME types
  */
 function isValidImageFile(file) {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
-    return file && validTypes.includes(file.type);
+    if (!file) return false;
+
+    // Check MIME type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif'];
+    if (validTypes.includes(file.type.toLowerCase())) {
+        return true;
+    }
+
+    // Fallback: check file extension for mobile browsers that may not report correct MIME type
+    const fileName = file.name.toLowerCase();
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.heic', '.heif'];
+    return validExtensions.some(ext => fileName.endsWith(ext));
 }
 
 /**
@@ -257,14 +277,32 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview
+ * Display template preview - Mobile compatible
  */
 function displayTemplatePreview(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
-        document.querySelector('.upload-placeholder').style.display = 'none';
-        document.getElementById('templatePreview').style.display = 'block';
-        document.getElementById('templatePreviewImg').src = e.target.result;
+        const uploadLabel = document.getElementById('templateUploadLabel');
+        const templatePreview = document.getElementById('templatePreview');
+        const templatePreviewImg = document.getElementById('templatePreviewImg');
+
+        if (uploadLabel) uploadLabel.style.display = 'none';
+        if (templatePreview) templatePreview.style.display = 'block';
+        if (templatePreviewImg) {
+            templatePreviewImg.src = e.target.result;
+            // Force image to load on mobile
+            templatePreviewImg.onload = function() {
+                console.log('Template image loaded successfully');
+            };
+            templatePreviewImg.onerror = function() {
+                console.error('Failed to load template image');
+                alert('Failed to display image preview. Please try again.');
+            };
+        }
+    };
+    reader.onerror = function(e) {
+        console.error('FileReader error:', e);
+        alert('Failed to read the image file. Please try again.');
     };
     reader.readAsDataURL(file);
 }
@@ -274,36 +312,81 @@ function displayTemplatePreview(file) {
  */
 function removeTemplate() {
     templateFile = null;
-    document.getElementById('templateInput').value = '';
-    document.querySelector('.upload-placeholder').style.display = 'block';
-    document.getElementById('templatePreview').style.display = 'none';
+    const templateInput = document.getElementById('templateInput');
+    const uploadLabel = document.getElementById('templateUploadLabel');
+    const templatePreview = document.getElementById('templatePreview');
+
+    if (templateInput) templateInput.value = '';
+    if (uploadLabel) uploadLabel.style.display = 'flex';
+    if (templatePreview) templatePreview.style.display = 'none';
 }
 
 /**
- * Display base image previews (for edit mode with multiple images)
+ * Display base image previews (for edit mode with multiple images) - Mobile compatible
  */
 function displayBaseImagePreviews() {
     const container = document.getElementById('baseImagePreviews');
+    if (!container) return;
+
     container.innerHTML = '';
+
+    if (baseImageFiles.length === 0) {
+        return;
+    }
 
     baseImageFiles.forEach((file, index) => {
         const reader = new FileReader();
         reader.onload = function(e) {
             const div = document.createElement('div');
             div.className = 'base-image-preview-item' + (index === primaryImageIndex ? ' primary' : '');
-            div.innerHTML = `
-                <img src="${e.target.result}" alt="Image ${index + 1}">
-                <div class="primary-star" onclick="setPrimaryImage(${index})" title="Set as primary image">
-                    <i class="fas fa-star"></i>
-                </div>
-                <button type="button" class="btn btn-sm btn-danger remove-btn" onclick="removeBaseImage(${index})">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="image-label">
-                    ${index === primaryImageIndex ? 'Primary Image' : 'Associated Image'}
-                </div>
-            `;
+
+            // Create image element for better mobile compatibility
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'Image ' + (index + 1);
+            img.onload = function() {
+                console.log('Base image ' + (index + 1) + ' loaded successfully');
+            };
+            img.onerror = function() {
+                console.error('Failed to load base image ' + (index + 1));
+            };
+
+            div.appendChild(img);
+
+            // Add star button for primary selection
+            const starDiv = document.createElement('div');
+            starDiv.className = 'primary-star';
+            starDiv.title = 'Set as primary image';
+            starDiv.innerHTML = '<i class="fas fa-star"></i>';
+            starDiv.addEventListener('click', function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                setPrimaryImage(index);
+            });
+            div.appendChild(starDiv);
+
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-danger remove-btn';
+            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            removeBtn.addEventListener('click', function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                removeBaseImage(index);
+            });
+            div.appendChild(removeBtn);
+
+            // Add label
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'image-label';
+            labelDiv.textContent = index === primaryImageIndex ? 'Primary Image' : 'Associated Image';
+            div.appendChild(labelDiv);
+
             container.appendChild(div);
+        };
+        reader.onerror = function(e) {
+            console.error('FileReader error for base image:', e);
         };
         reader.readAsDataURL(file);
     });
@@ -339,24 +422,53 @@ function removeBaseImage(index) {
 }
 
 /**
- * Display product image previews
+ * Display product image previews - Mobile compatible
  */
 function displayProductPreviews() {
     const container = document.getElementById('productPreviews');
+    if (!container) return;
+
     container.innerHTML = '';
+
+    if (productFiles.length === 0) {
+        return;
+    }
 
     productFiles.forEach((file, index) => {
         const reader = new FileReader();
         reader.onload = function(e) {
             const div = document.createElement('div');
             div.className = 'product-preview-item';
-            div.innerHTML = `
-                <img src="${e.target.result}" alt="Product ${index + 1}">
-                <button type="button" class="btn btn-sm btn-danger remove-btn" onclick="removeProductImage(${index})">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
+
+            // Create image element for better mobile compatibility
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'Product ' + (index + 1);
+            img.onload = function() {
+                console.log('Product image ' + (index + 1) + ' loaded successfully');
+            };
+            img.onerror = function() {
+                console.error('Failed to load product image ' + (index + 1));
+            };
+
+            div.appendChild(img);
+
+            // Add remove button with proper event listener
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-danger remove-btn';
+            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            removeBtn.addEventListener('click', function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                removeProductImage(index);
+            });
+            div.appendChild(removeBtn);
+
             container.appendChild(div);
+        };
+        reader.onerror = function(e) {
+            console.error('FileReader error for product image:', e);
         };
         reader.readAsDataURL(file);
     });

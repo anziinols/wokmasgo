@@ -89,12 +89,12 @@
                         Upload multiple images. Click the star <i class="fas fa-star text-warning"></i> to set the primary image to edit. Other images can be inserted into the primary image.
                     </div>
                     <div class="upload-area" id="baseImageUploadArea">
-                        <input type="file" id="baseImageInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" multiple class="d-none">
-                        <div class="upload-placeholder" onclick="document.getElementById('baseImageInput').click()">
+                        <input type="file" id="baseImageInput" accept="image/*" multiple class="mobile-file-input">
+                        <label for="baseImageInput" class="upload-placeholder upload-label">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
-                            <p class="mb-0">Click to upload images or drag and drop</p>
+                            <p class="mb-0">Tap to upload images or drag and drop</p>
                             <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB each, Multiple files)</small>
-                        </div>
+                        </label>
                         <div class="base-image-previews" id="baseImagePreviews"></div>
                     </div>
                 </div>
@@ -106,12 +106,12 @@
                         Upload Flyer Template (Optional)
                     </label>
                     <div class="upload-area" id="templateUploadArea">
-                        <input type="file" id="templateInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" class="d-none">
-                        <div class="upload-placeholder" onclick="document.getElementById('templateInput').click()">
+                        <input type="file" id="templateInput" accept="image/*" class="mobile-file-input">
+                        <label for="templateInput" class="upload-placeholder upload-label" id="templateUploadLabel">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
-                            <p class="mb-0">Click to upload template or drag and drop</p>
+                            <p class="mb-0">Tap to upload template or drag and drop</p>
                             <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB)</small>
-                        </div>
+                        </label>
                         <div class="template-preview" id="templatePreview" style="display: none;">
                             <img id="templatePreviewImg" src="" alt="Template Preview">
                             <button type="button" class="btn btn-sm btn-danger remove-btn" onclick="removeTemplate()">
@@ -128,12 +128,12 @@
                         Upload Product Images (Multiple)
                     </label>
                     <div class="upload-area" id="productUploadArea">
-                        <input type="file" id="productImagesInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/avif" multiple class="d-none">
-                        <div class="upload-placeholder" onclick="document.getElementById('productImagesInput').click()">
+                        <input type="file" id="productImagesInput" accept="image/*" multiple class="mobile-file-input">
+                        <label for="productImagesInput" class="upload-placeholder upload-label">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
-                            <p class="mb-0">Click to upload product images or drag and drop</p>
+                            <p class="mb-0">Tap to upload product images or drag and drop</p>
                             <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB each)</small>
-                        </div>
+                        </label>
                         <div class="product-previews" id="productPreviews"></div>
                     </div>
                 </div>

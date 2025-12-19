@@ -142,22 +142,36 @@
 
 /* Upload Area */
 .upload-area {
+    position: relative;
     border: 3px dashed #d0d0d0;
     border-radius: 15px;
     padding: 2rem;
     text-align: center;
     background: #f9f9f9;
     transition: all 0.3s ease;
+    overflow: hidden;
 }
 
-.upload-area:hover {
+.upload-area:hover,
+.upload-area:focus-within {
     border-color: var(--gold);
     background: rgba(255, 215, 0, 0.05);
+}
+
+/* Active state for touch devices */
+.upload-area:active {
+    border-color: var(--maroon);
+    background: rgba(128, 0, 32, 0.05);
 }
 
 .upload-placeholder {
     cursor: pointer;
     padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
 }
 
 .upload-placeholder i {
@@ -408,6 +422,30 @@
     border: 3px solid var(--maroon);
 }
 
+/* Mobile file input styling - ensures proper visibility and touch targets */
+.mobile-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Upload label styling for mobile */
+.upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .page-title {
@@ -429,11 +467,92 @@
     }
 
     .product-previews {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
     }
 
     .btn-gradient {
         padding: 0.6rem 1.5rem;
+    }
+
+    /* Mobile upload area improvements */
+    .upload-area {
+        min-height: 150px;
+        touch-action: manipulation;
+    }
+
+    .upload-placeholder {
+        padding: 1.5rem;
+    }
+
+    .upload-placeholder i {
+        font-size: 2.5rem !important;
+    }
+
+    .upload-placeholder p {
+        font-size: 0.9rem;
+    }
+
+    .upload-placeholder small {
+        font-size: 0.75rem;
+    }
+
+    /* Mobile image preview improvements */
+    .template-preview img {
+        max-height: 250px;
+    }
+
+    .base-image-previews {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+    }
+
+    .base-image-preview-item {
+        min-height: 100px;
+    }
+
+    .base-image-preview-item img {
+        max-height: 100px;
+    }
+
+    .product-preview-item {
+        min-height: 80px;
+    }
+
+    .product-preview-item img {
+        max-height: 80px;
+    }
+
+    /* Larger touch targets for buttons on mobile */
+    .remove-btn {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 8px !important;
+    }
+
+    .primary-star {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 8px;
+    }
+
+    .image-label {
+        font-size: 0.65rem;
+        padding: 2px 4px;
+    }
+
+    /* Result section mobile adjustments */
+    .result-container {
+        padding: 1rem;
+    }
+
+    .result-container img {
+        max-height: 400px;
+    }
+
+    /* Prompt input mobile adjustments */
+    #promptInput {
+        font-size: 16px; /* Prevents iOS zoom on focus */
     }
 }
 
