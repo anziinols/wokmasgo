@@ -75,12 +75,145 @@ function isValidImageFile(file) {
 }
 
 /**
- * Create a simple blob URL for image preview
- * No conversion - just display the raw image
+ * Check if file is HEIC/HEIF format (iPhone photos)
+ */
+function isHeicFile(file) {
+    if (!file) return false;
+    var type = file.type ? file.type.toLowerCase() : '';
+    var name = file.name ? file.name.toLowerCase() : '';
+    return type === 'image/heic' || type === 'image/heif' ||
+           name.endsWith('.heic') || name.endsWith('.heif');
+}
+
+/**
+ * Create a preview data URL for image
+ * Uses FileReader for better mobile compatibility
+ * Converts HEIC to JPEG for browser display
+ * Returns a Promise that resolves to {dataUrl, file}
  */
 function createPreviewUrl(file) {
-    if (!file) return null;
-    return URL.createObjectURL(file);
+    return new Promise(function(resolve, reject) {
+        if (!file) {
+            reject(new Error('No file provided'));
+            return;
+        }
+
+        console.log('[createPreviewUrl] Processing:', file.name, 'Type:', file.type, 'Size:', file.size);
+
+        // Check if HEIC file - needs conversion
+        if (isHeicFile(file)) {
+            console.log('[createPreviewUrl] HEIC file detected, converting to JPEG...');
+
+            if (typeof heic2any === 'undefined') {
+                console.error('[createPreviewUrl] heic2any library not loaded');
+                reject(new Error('HEIC conversion library not available'));
+                return;
+            }
+
+            heic2any({
+                blob: file,
+                toType: 'image/jpeg',
+                quality: 0.8
+            }).then(function(convertedBlob) {
+                console.log('[createPreviewUrl] HEIC converted successfully');
+                // Read converted blob as data URL
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    // Create a new File from converted blob
+                    var convertedFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), {
+                        type: 'image/jpeg'
+                    });
+                    resolve({ dataUrl: e.target.result, file: convertedFile });
+                };
+                reader.onerror = function() {
+                    reject(new Error('Failed to read converted HEIC file'));
+                };
+                reader.readAsDataURL(convertedBlob);
+            }).catch(function(err) {
+                console.error('[createPreviewUrl] HEIC conversion failed:', err);
+                reject(err);
+            });
+        } else {
+            // Standard image - read directly as data URL
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('[createPreviewUrl] File read successfully');
+                resolve({ dataUrl: e.target.result, file: file });
+            };
+            reader.onerror = function() {
+                console.error('[createPreviewUrl] FileReader error');
+                reject(new Error('Failed to read file'));
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Storage for processed previews (data URLs)
+var productPreviews = []; // Array of {file, dataUrl}
+var baseImagePreviews = []; // Array of {file, dataUrl}
+
+/**
+ * Show template loading state
+ */
+function showTemplateLoading() {
+    var uploadLabel = document.getElementById('templateUploadLabel');
+    var templatePreview = document.getElementById('templatePreview');
+    if (uploadLabel) uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+}
+
+/**
+ * Hide template loading state
+ */
+function hideTemplateLoading() {
+    var uploadLabel = document.getElementById('templateUploadLabel');
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>Click to upload or drag and drop</span><span class="file-hint">JPG, PNG, GIF, WEBP, AVIF, HEIC (Max 5MB)</span>';
+    }
+}
+
+/**
+ * Process multiple product files and create previews
+ */
+function processProductFiles(files) {
+    console.log('[processProductFiles] Processing', files.length, 'files');
+
+    var promises = files.map(function(file) {
+        return createPreviewUrl(file);
+    });
+
+    Promise.all(promises).then(function(results) {
+        results.forEach(function(result) {
+            productFiles.push(result.file);
+            productPreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        });
+        displayProductPreviews();
+    }).catch(function(err) {
+        console.error('[processProductFiles] Error:', err);
+        alert('Failed to process one or more images.');
+    });
+}
+
+/**
+ * Process multiple base image files and create previews
+ */
+function processBaseImageFiles(files) {
+    console.log('[processBaseImageFiles] Processing', files.length, 'files');
+
+    var promises = files.map(function(file) {
+        return createPreviewUrl(file);
+    });
+
+    Promise.all(promises).then(function(results) {
+        results.forEach(function(result) {
+            baseImageFiles.push(result.file);
+            baseImagePreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        });
+        displayBaseImagePreviews();
+    }).catch(function(err) {
+        console.error('[processBaseImageFiles] Error:', err);
+        alert('Failed to process one or more images.');
+    });
 }
 
 /**
@@ -189,8 +322,8 @@ document.addEventListener('DOMContentLoaded', function() {
  * Handle template file upload
  */
 document.addEventListener('DOMContentLoaded', function() {
-    const templateInput = document.getElementById('templateInput');
-    const templateUploadArea = document.getElementById('templateUploadArea');
+    var templateInput = document.getElementById('templateInput');
+    var templateUploadArea = document.getElementById('templateUploadArea');
 
     if (templateInput) {
         templateInput.addEventListener('change', function(e) {
@@ -209,10 +342,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Store raw file and display preview
-            templateFile = file;
-            var previewUrl = createPreviewUrl(file);
-            displayTemplatePreview(previewUrl, file.name);
+            // Show loading state
+            showTemplateLoading();
+
+            // Create preview (handles HEIC conversion if needed)
+            createPreviewUrl(file).then(function(result) {
+                templateFile = result.file;
+                displayTemplatePreview(result.dataUrl, result.file.name);
+            }).catch(function(err) {
+                console.error('[Template Upload] Error:', err);
+                alert('Failed to process image. Please try another file.');
+                hideTemplateLoading();
+            });
         });
     }
 
@@ -245,10 +386,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Store raw file and display preview
-            templateFile = file;
-            var previewUrl = createPreviewUrl(file);
-            displayTemplatePreview(previewUrl, file.name);
+            // Show loading state
+            showTemplateLoading();
+
+            // Create preview (handles HEIC conversion if needed)
+            createPreviewUrl(file).then(function(result) {
+                templateFile = result.file;
+                displayTemplatePreview(result.dataUrl, result.file.name);
+            }).catch(function(err) {
+                console.error('[Template Drop] Error:', err);
+                alert('Failed to process image. Please try another file.');
+                hideTemplateLoading();
+            });
         });
     }
 
@@ -261,7 +410,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate and store files
+            // Validate files first
+            var validFiles = [];
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -272,10 +422,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                productFiles.push(file);
+                validFiles.push(file);
             }
 
-            displayProductPreviews();
+            if (validFiles.length === 0) return;
+
+            // Process files and create previews
+            processProductFiles(validFiles);
         });
     }
 
@@ -298,7 +451,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
 
-            // Validate and store files
+            // Validate files first
+            var validFiles = [];
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -309,10 +463,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                productFiles.push(file);
+                validFiles.push(file);
             }
 
-            displayProductPreviews();
+            if (validFiles.length === 0) return;
+
+            // Process files and create previews
+            processProductFiles(validFiles);
         });
     }
 
@@ -325,7 +482,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate and store files
+            // Validate files first
+            var validFiles = [];
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -336,10 +494,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                baseImageFiles.push(file);
+                validFiles.push(file);
             }
 
-            displayBaseImagePreviews();
+            if (validFiles.length === 0) return;
+
+            // Process files and create previews
+            processBaseImageFiles(validFiles);
         });
     }
 
@@ -362,7 +523,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
 
-            // Validate and store files
+            // Validate files first
+            var validFiles = [];
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -373,10 +535,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                baseImageFiles.push(file);
+                validFiles.push(file);
             }
 
-            displayBaseImagePreviews();
+            if (validFiles.length === 0) return;
+
+            // Process files and create previews
+            processBaseImageFiles(validFiles);
         });
     }
 
@@ -441,17 +606,20 @@ function displayTemplatePreview(previewUrl, fileName) {
  */
 function removeTemplate() {
     templateFile = null;
-    const templateInput = document.getElementById('templateInput');
-    const uploadLabel = document.getElementById('templateUploadLabel');
-    const templatePreview = document.getElementById('templatePreview');
+    var templateInput = document.getElementById('templateInput');
+    var uploadLabel = document.getElementById('templateUploadLabel');
+    var templatePreview = document.getElementById('templatePreview');
 
     if (templateInput) templateInput.value = '';
-    if (uploadLabel) uploadLabel.style.display = 'flex';
+    if (uploadLabel) {
+        uploadLabel.style.display = 'flex';
+        hideTemplateLoading(); // Reset the label text
+    }
     if (templatePreview) templatePreview.style.display = 'none';
 }
 
 /**
- * Display base image previews using blob URLs
+ * Display base image previews using stored data URLs
  */
 function displayBaseImagePreviews() {
     var container = document.getElementById('baseImagePreviews');
@@ -459,16 +627,16 @@ function displayBaseImagePreviews() {
 
     container.innerHTML = '';
 
-    if (baseImageFiles.length === 0) return;
+    if (baseImagePreviews.length === 0) return;
 
-    // Create preview for each image
-    baseImageFiles.forEach(function(file, index) {
+    // Create preview for each image using stored data URLs
+    baseImagePreviews.forEach(function(preview, index) {
         var div = document.createElement('div');
         div.className = 'base-image-preview-item' + (index === primaryImageIndex ? ' primary' : '');
 
         var img = document.createElement('img');
-        img.alt = file.name;
-        img.src = createPreviewUrl(file);
+        img.alt = preview.file.name;
+        img.src = preview.dataUrl;
         div.appendChild(img);
 
         // Add star button for primary selection
@@ -528,6 +696,7 @@ function setPrimaryImage(index) {
  */
 function removeBaseImage(index) {
     baseImageFiles.splice(index, 1);
+    baseImagePreviews.splice(index, 1);
 
     // Adjust primary index if needed
     if (primaryImageIndex >= baseImageFiles.length && baseImageFiles.length > 0) {
@@ -544,7 +713,7 @@ function removeBaseImage(index) {
 }
 
 /**
- * Display product image previews using blob URLs
+ * Display product image previews using stored data URLs
  */
 function displayProductPreviews() {
     var container = document.getElementById('productPreviews');
@@ -557,7 +726,7 @@ function displayProductPreviews() {
 
     container.innerHTML = '';
 
-    var totalFiles = productFiles.length;
+    var totalFiles = productPreviews.length;
 
     // Show/hide elements based on whether there are files
     if (totalFiles === 0) {
@@ -582,15 +751,15 @@ function displayProductPreviews() {
         productCountSpan.textContent = totalFiles;
     }
 
-    // Create preview for each file
-    productFiles.forEach(function(file, index) {
+    // Create preview for each file using stored data URLs
+    productPreviews.forEach(function(preview, index) {
         var div = document.createElement('div');
         div.className = 'product-preview-item';
         div.setAttribute('data-index', index);
 
         var img = document.createElement('img');
-        img.alt = file.name;
-        img.src = createPreviewUrl(file);
+        img.alt = preview.file.name;
+        img.src = preview.dataUrl;
         div.appendChild(img);
 
         // Add remove button
@@ -613,6 +782,7 @@ function displayProductPreviews() {
 function removeProductImage(index) {
     if (index >= 0 && index < productFiles.length) {
         productFiles.splice(index, 1);
+        productPreviews.splice(index, 1);
     }
     displayProductPreviews();
 }
