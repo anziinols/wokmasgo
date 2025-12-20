@@ -169,8 +169,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Store file reference immediately
             templateFile = file;
-            displayTemplatePreview(file);
+
+            // Small delay for mobile browsers to ensure file is ready
+            setTimeout(function() {
+                displayTemplatePreview(templateFile);
+            }, 10);
         });
     }
 
@@ -208,8 +213,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Store file reference immediately
             templateFile = file;
-            displayTemplatePreview(file);
+
+            // Small delay for mobile browsers to ensure file is ready
+            setTimeout(function() {
+                displayTemplatePreview(templateFile);
+            }, 10);
         });
     }
 
@@ -233,7 +243,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 productFiles.push(file);
             });
 
-            displayProductPreviews();
+            // Small delay for mobile browsers to ensure files are ready
+            setTimeout(function() {
+                displayProductPreviews();
+            }, 10);
         });
     }
 
@@ -267,7 +280,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 productFiles.push(file);
             });
 
-            displayProductPreviews();
+            // Small delay for mobile browsers to ensure files are ready
+            setTimeout(function() {
+                displayProductPreviews();
+            }, 10);
         });
     }
 
@@ -362,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview - simplified
+ * Display template preview - simplified with better mobile support
  */
 function displayTemplatePreview(file) {
     var uploadLabel = document.getElementById('templateUploadLabel');
@@ -374,6 +390,12 @@ function displayTemplatePreview(file) {
         return;
     }
 
+    // Validate file before reading
+    if (!file || !(file instanceof File) || !file.size) {
+        alert('Invalid file. Please try again.');
+        return;
+    }
+
     // Hide upload label, show preview container
     if (uploadLabel) uploadLabel.style.display = 'none';
     if (templatePreview) templatePreview.style.display = 'block';
@@ -382,14 +404,25 @@ function displayTemplatePreview(file) {
     var reader = new FileReader();
 
     reader.onload = function(e) {
-        templatePreviewImg.src = e.target.result;
+        if (e.target && e.target.result) {
+            templatePreviewImg.src = e.target.result;
+        } else {
+            alert('Failed to load image. Please try again.');
+        }
     };
 
-    reader.onerror = function() {
+    reader.onerror = function(err) {
+        console.error('FileReader error:', err);
         alert('Failed to read image. Please try a different file.');
     };
 
-    reader.readAsDataURL(file);
+    // Read the file
+    try {
+        reader.readAsDataURL(file);
+    } catch (e) {
+        console.error('Exception reading file:', e);
+        alert('Error reading file. Please try again.');
+    }
 }
 
 /**
@@ -587,6 +620,12 @@ function displayProductPreviews() {
     // Process each file using FileReader
     for (var i = 0; i < productFiles.length; i++) {
         (function(index, file) {
+            // Validate file before processing
+            if (!file || !(file instanceof File) || !file.size) {
+                console.error('Invalid file at index:', index);
+                return;
+            }
+
             var div = document.createElement('div');
             div.className = 'product-preview-item';
             div.setAttribute('data-index', index);
@@ -597,12 +636,20 @@ function displayProductPreviews() {
             // Use FileReader to display preview
             var reader = new FileReader();
             reader.onload = function(e) {
-                img.src = e.target.result;
+                if (e.target && e.target.result) {
+                    img.src = e.target.result;
+                }
             };
-            reader.onerror = function() {
-                console.error('Failed to read image:', file.name);
+            reader.onerror = function(err) {
+                console.error('Failed to read image:', file.name, err);
             };
-            reader.readAsDataURL(file);
+
+            // Read the file with error handling
+            try {
+                reader.readAsDataURL(file);
+            } catch (e) {
+                console.error('Exception reading file:', file.name, e);
+            }
 
             div.appendChild(img);
 
