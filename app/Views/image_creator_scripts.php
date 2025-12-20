@@ -6,6 +6,10 @@ let productFiles = [];
 let baseImageFiles = []; // For image editing - multiple images
 let primaryImageIndex = 0; // Index of the primary image to edit
 
+// Mobile fix: Store base64 data to avoid re-reading files
+let templateBase64Data = null;  // Store base64 for template (mobile fix)
+let productBase64Data = [];     // Store base64 for products (mobile fix)
+
 /**
  * Detect if device is mobile
  */
@@ -177,6 +181,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             reader.onload = function(e) {
                 if (e.target && e.target.result) {
+                    // Store base64 for later use (mobile fix - avoid re-reading file)
+                    templateBase64Data = e.target.result;
                     // Pass base64 result, not File object
                     displayTemplatePreview(e.target.result, file.name);
                 } else {
@@ -240,6 +246,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             reader.onload = function(e) {
                 if (e.target && e.target.result) {
+                    // Store base64 for later use (mobile fix - avoid re-reading file)
+                    templateBase64Data = e.target.result;
                     displayTemplatePreview(e.target.result, file.name);
                 } else {
                     alert('Failed to load image. Please try again.');
@@ -305,6 +313,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // When all files are read, display previews
                         if (filesRead === filesToProcess.length) {
+                            // Store base64 data for later use (mobile fix - avoid re-reading files)
+                            productBase64Data = base64Results.map(function(r) { return r.data; });
                             displayProductPreviews(base64Results);
                         }
                     } else {
@@ -383,6 +393,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // When all files are read, display previews
                         if (filesRead === filesToProcess.length) {
+                            // Store base64 data for later use (mobile fix - avoid re-reading files)
+                            productBase64Data = base64Results.map(function(r) { return r.data; });
                             displayProductPreviews(base64Results);
                         }
                     } else {
@@ -533,6 +545,7 @@ function displayTemplatePreview(base64DataUrl, fileName) {
  */
 function removeTemplate() {
     templateFile = null;
+    templateBase64Data = null; // Clear stored base64 (mobile fix)
     const templateInput = document.getElementById('templateInput');
     const uploadLabel = document.getElementById('templateUploadLabel');
     const templatePreview = document.getElementById('templatePreview');
@@ -770,8 +783,23 @@ function displayProductPreviews(base64Results) {
 function removeProductImage(index) {
     if (index >= 0 && index < productFiles.length) {
         productFiles.splice(index, 1);
+        productBase64Data.splice(index, 1); // Also remove stored base64 (mobile fix)
     }
-    displayProductPreviews();
+
+    // Rebuild base64 array from remaining files if needed
+    if (productFiles.length === 0) {
+        productBase64Data = [];
+    }
+
+    // Rebuild base64Results array for display
+    var base64Results = productBase64Data.map(function(data, idx) {
+        return {
+            data: data,
+            name: productFiles[idx] ? productFiles[idx].name : 'Product ' + (idx + 1)
+        };
+    });
+
+    displayProductPreviews(base64Results);
 }
 
 /**
@@ -1310,8 +1338,10 @@ async function callGeminiNanoBanana(prompt) {
         if (selectedMode === 'create' && templateFile) {
             try {
                 console.log('[callGeminiNanoBanana] Converting template image...');
-                var templateBase64 = await fileToBase64(templateFile);
+                // Use stored base64 if available (mobile fix), otherwise read file
+                var templateBase64 = templateBase64Data || await fileToBase64(templateFile);
                 console.log('[callGeminiNanoBanana] Template converted, size:', Math.round(templateBase64.length / 1024), 'KB');
+                console.log('[callGeminiNanoBanana] Used stored base64:', templateBase64Data ? 'YES' : 'NO (read from file)');
                 contentParts.push({
                     type: "image_url",
                     image_url: {
@@ -1330,7 +1360,9 @@ async function callGeminiNanoBanana(prompt) {
             for (var j = 0; j < productFiles.length; j++) {
                 try {
                     console.log('[callGeminiNanoBanana] Converting product image', j + 1);
-                    var productBase64 = await fileToBase64(productFiles[j]);
+                    // Use stored base64 if available (mobile fix), otherwise read file
+                    var productBase64 = productBase64Data[j] || await fileToBase64(productFiles[j]);
+                    console.log('[callGeminiNanoBanana] Product', j + 1, 'used stored base64:', productBase64Data[j] ? 'YES' : 'NO (read from file)');
                     contentParts.push({
                         type: "image_url",
                         image_url: {
@@ -1510,6 +1542,10 @@ function resetForm() {
     baseImageFiles = [];
     primaryImageIndex = 0;
 
+    // Clear stored base64 data (mobile fix)
+    templateBase64Data = null;
+    productBase64Data = [];
+
     // Reset file inputs
     document.getElementById('templateInput').value = '';
     if (document.getElementById('productImagesInput')) {
@@ -1555,6 +1591,10 @@ function refreshPage() {
     productFiles = [];
     baseImageFiles = [];
     primaryImageIndex = 0;
+
+    // Clear stored base64 data (mobile fix)
+    templateBase64Data = null;
+    productBase64Data = [];
 
     // Clear all form inputs
     const promptInput = document.getElementById('promptInput');
