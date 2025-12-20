@@ -9,16 +9,12 @@
             <p class="page-subtitle">Generate an eye-catching flyer for your promotion with AI</p>
         </div>
 
-        <!-- Back to Flyer Options and Refresh -->
+        <!-- Back to Flyer Options -->
         <div class="mb-4">
             <a href="<?= base_url('image-creator/flyer') ?>" class="btn btn-outline-maroon">
                 <i class="fas fa-arrow-left me-2"></i>
                 Back to Flyer Options
             </a>
-            <button type="button" class="btn btn-outline-maroon ms-2" onclick="refreshPage()">
-                <i class="fas fa-sync-alt me-2"></i>
-                Refresh
-            </button>
         </div>
 
         <!-- Flyer Generation Form -->

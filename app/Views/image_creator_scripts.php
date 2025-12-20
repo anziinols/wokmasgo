@@ -1,3 +1,30 @@
+// Clear browser storage on page load to prevent stale file references
+(function() {
+    try {
+        // Clear localStorage
+        const localKeysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
+                localKeysToRemove.push(key);
+            }
+        }
+        localKeysToRemove.forEach(key => localStorage.removeItem(key));
+
+        // Clear sessionStorage
+        const sessionKeysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
+                sessionKeysToRemove.push(key);
+            }
+        }
+        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+    } catch (e) {
+        console.log('Error clearing storage on page load:', e);
+    }
+})();
+
 // State variables
 let selectedType = '';
 let selectedMode = ''; // 'create' or 'edit' for flyers
@@ -5,10 +32,6 @@ let templateFile = null;
 let productFiles = [];
 let baseImageFiles = []; // For image editing - multiple images
 let primaryImageIndex = 0; // Index of the primary image to edit
-
-// Mobile fix: Store base64 data to avoid re-reading files
-let templateBase64Data = null;  // Store base64 for template (mobile fix)
-let productBase64Data = [];     // Store base64 for products (mobile fix)
 
 /**
  * Detect if device is mobile
@@ -173,34 +196,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Store file reference for later API use
+            // Store file reference for API use during generation
             templateFile = file;
 
-            // Read file IMMEDIATELY while reference is valid (mobile fix)
-            var reader = new FileReader();
-
-            reader.onload = function(e) {
-                if (e.target && e.target.result) {
-                    // Store base64 for later use (mobile fix - avoid re-reading file)
-                    templateBase64Data = e.target.result;
-                    // Pass base64 result, not File object
-                    displayTemplatePreview(e.target.result, file.name);
-                } else {
-                    alert('Failed to load image. Please try again.');
-                }
-            };
-
-            reader.onerror = function(err) {
-                console.error('FileReader error:', err, reader.error);
-                alert('Failed to read image. Please try a different file.');
-            };
-
-            try {
-                reader.readAsDataURL(file);
-            } catch (e) {
-                console.error('Exception reading file:', e);
-                alert('Error reading file. Please try again.');
-            }
+            // Create Object URL for preview (no FileReader needed - instant!)
+            const objectUrl = URL.createObjectURL(file);
+            displayTemplatePreview(objectUrl, file.name);
         });
     }
 
@@ -238,33 +239,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Store file reference for later API use
+            // Store file reference for API use during generation
             templateFile = file;
 
-            // Read file IMMEDIATELY while reference is valid (mobile fix)
-            var reader = new FileReader();
-
-            reader.onload = function(e) {
-                if (e.target && e.target.result) {
-                    // Store base64 for later use (mobile fix - avoid re-reading file)
-                    templateBase64Data = e.target.result;
-                    displayTemplatePreview(e.target.result, file.name);
-                } else {
-                    alert('Failed to load image. Please try again.');
-                }
-            };
-
-            reader.onerror = function(err) {
-                console.error('FileReader error:', err, reader.error);
-                alert('Failed to read image. Please try a different file.');
-            };
-
-            try {
-                reader.readAsDataURL(file);
-            } catch (e) {
-                console.error('Exception reading file:', e);
-                alert('Error reading file. Please try again.');
-            }
+            // Create Object URL for preview (no FileReader needed - instant!)
+            const objectUrl = URL.createObjectURL(file);
+            displayTemplatePreview(objectUrl, file.name);
         });
     }
 
@@ -275,9 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (productImagesInput) {
         productImagesInput.addEventListener('change', function(e) {
             var files = Array.from(e.target.files);
-            var filesToProcess = [];
 
-            // Validate all files first
+            // Validate and store files
             files.forEach(function(file) {
                 if (!isValidImageFile(file)) {
                     alert('Invalid file type: ' + file.name);
@@ -288,53 +267,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                filesToProcess.push(file);
-                productFiles.push(file); // Store File object for API use
+                productFiles.push(file); // Store File object for API use during generation
             });
 
-            if (filesToProcess.length === 0) {
+            if (productFiles.length === 0) {
                 return;
             }
 
-            // Read all files immediately while references are valid
-            var base64Results = [];
-            var filesRead = 0;
-
-            filesToProcess.forEach(function(file, idx) {
-                var reader = new FileReader();
-
-                reader.onload = function(e) {
-                    if (e.target && e.target.result) {
-                        base64Results[idx] = {
-                            data: e.target.result,
-                            name: file.name
-                        };
-                        filesRead++;
-
-                        // When all files are read, display previews
-                        if (filesRead === filesToProcess.length) {
-                            // Store base64 data for later use (mobile fix - avoid re-reading files)
-                            productBase64Data = base64Results.map(function(r) { return r.data; });
-                            displayProductPreviews(base64Results);
-                        }
-                    } else {
-                        console.error('FileReader result is null for file:', file.name);
-                        alert('Failed to load image: ' + file.name);
-                    }
+            // Create Object URLs for preview (no FileReader needed - instant!)
+            var objectUrls = productFiles.map(function(file) {
+                return {
+                    url: URL.createObjectURL(file),
+                    name: file.name
                 };
-
-                reader.onerror = function(err) {
-                    console.error('FileReader error for file:', file.name, err, reader.error);
-                    alert('Failed to read image: ' + file.name);
-                };
-
-                try {
-                    reader.readAsDataURL(file);
-                } catch (e) {
-                    console.error('Exception reading file:', file.name, e);
-                    alert('Error reading file: ' + file.name);
-                }
             });
+
+            displayProductPreviews(objectUrls);
         });
     }
 
@@ -355,9 +303,8 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.borderColor = '#d0d0d0';
 
             var files = Array.from(e.dataTransfer.files);
-            var filesToProcess = [];
 
-            // Validate all files first
+            // Validate and store files
             files.forEach(function(file) {
                 if (!isValidImageFile(file)) {
                     alert('Invalid file type: ' + file.name);
@@ -368,53 +315,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                filesToProcess.push(file);
-                productFiles.push(file); // Store File object for API use
+                productFiles.push(file); // Store File object for API use during generation
             });
 
-            if (filesToProcess.length === 0) {
+            if (productFiles.length === 0) {
                 return;
             }
 
-            // Read all files immediately while references are valid
-            var base64Results = [];
-            var filesRead = 0;
-
-            filesToProcess.forEach(function(file, idx) {
-                var reader = new FileReader();
-
-                reader.onload = function(e) {
-                    if (e.target && e.target.result) {
-                        base64Results[idx] = {
-                            data: e.target.result,
-                            name: file.name
-                        };
-                        filesRead++;
-
-                        // When all files are read, display previews
-                        if (filesRead === filesToProcess.length) {
-                            // Store base64 data for later use (mobile fix - avoid re-reading files)
-                            productBase64Data = base64Results.map(function(r) { return r.data; });
-                            displayProductPreviews(base64Results);
-                        }
-                    } else {
-                        console.error('FileReader result is null for file:', file.name);
-                        alert('Failed to load image: ' + file.name);
-                    }
+            // Create Object URLs for preview (no FileReader needed - instant!)
+            var objectUrls = productFiles.map(function(file) {
+                return {
+                    url: URL.createObjectURL(file),
+                    name: file.name
                 };
-
-                reader.onerror = function(err) {
-                    console.error('FileReader error for file:', file.name, err, reader.error);
-                    alert('Failed to read image: ' + file.name);
-                };
-
-                try {
-                    reader.readAsDataURL(file);
-                } catch (e) {
-                    console.error('Exception reading file:', file.name, e);
-                    alert('Error reading file: ' + file.name);
-                }
             });
+
+            displayProductPreviews(objectUrls);
         });
     }
 
@@ -509,9 +425,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview - receives base64 data URL (mobile fix)
+ * Display template preview - receives Object URL
  */
-function displayTemplatePreview(base64DataUrl, fileName) {
+function displayTemplatePreview(objectUrl, fileName) {
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
@@ -521,8 +437,7 @@ function displayTemplatePreview(base64DataUrl, fileName) {
         return;
     }
 
-    // Validate base64 data
-    if (!base64DataUrl || typeof base64DataUrl !== 'string') {
+    if (!objectUrl) {
         alert('Invalid image data. Please try again.');
         return;
     }
@@ -531,13 +446,8 @@ function displayTemplatePreview(base64DataUrl, fileName) {
     if (uploadLabel) uploadLabel.style.display = 'none';
     if (templatePreview) templatePreview.style.display = 'block';
 
-    // Set image src directly (no FileReader needed - already read in event handler)
-    try {
-        templatePreviewImg.src = base64DataUrl;
-    } catch (e) {
-        console.error('Error setting image src:', e);
-        alert('Error displaying image. Please try again.');
-    }
+    // Set image src to Object URL (instant, no FileReader needed!)
+    templatePreviewImg.src = objectUrl;
 }
 
 /**
@@ -545,7 +455,6 @@ function displayTemplatePreview(base64DataUrl, fileName) {
  */
 function removeTemplate() {
     templateFile = null;
-    templateBase64Data = null; // Clear stored base64 (mobile fix)
     const templateInput = document.getElementById('templateInput');
     const uploadLabel = document.getElementById('templateUploadLabel');
     const templatePreview = document.getElementById('templatePreview');
@@ -697,9 +606,9 @@ function removeBaseImage(index) {
 }
 
 /**
- * Display product image previews - receives base64 data (mobile fix)
+ * Display product image previews - receives Object URLs
  */
-function displayProductPreviews(base64Results) {
+function displayProductPreviews(objectUrls) {
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
     var placeholder = document.getElementById('productUploadPlaceholder');
@@ -711,7 +620,7 @@ function displayProductPreviews(base64Results) {
     container.innerHTML = '';
 
     // Show/hide elements based on whether there are results
-    if (!base64Results || base64Results.length === 0) {
+    if (!objectUrls || objectUrls.length === 0) {
         if (placeholder) placeholder.style.display = 'flex';
         if (previewsInline) previewsInline.style.display = 'none';
         if (uploadArea) uploadArea.classList.remove('has-images');
@@ -730,11 +639,11 @@ function displayProductPreviews(base64Results) {
     // Update count badge
     if (productCountSpan) {
         productCountSpan.style.display = 'inline-block';
-        productCountSpan.textContent = base64Results.length;
+        productCountSpan.textContent = objectUrls.length;
     }
 
-    // Create preview for each base64 result
-    for (var i = 0; i < base64Results.length; i++) {
+    // Create preview for each Object URL
+    for (var i = 0; i < objectUrls.length; i++) {
         (function(index, result) {
             var div = document.createElement('div');
             div.className = 'product-preview-item';
@@ -743,12 +652,8 @@ function displayProductPreviews(base64Results) {
             var img = document.createElement('img');
             img.alt = 'Product ' + (index + 1);
 
-            // Set image src directly (already read in event handler)
-            try {
-                img.src = result.data;
-            } catch (e) {
-                console.error('Error setting image src:', e);
-            }
+            // Set image src to Object URL (instant, no FileReader needed!)
+            img.src = result.url;
 
             div.appendChild(img);
 
@@ -773,33 +678,27 @@ function displayProductPreviews(base64Results) {
 
             div.appendChild(removeBtn);
             container.appendChild(div);
-        })(i, base64Results[i]);
+        })(i, objectUrls[i]);
     }
 }
 
 /**
- * Remove product image - simplified
+ * Remove product image
  */
 function removeProductImage(index) {
     if (index >= 0 && index < productFiles.length) {
         productFiles.splice(index, 1);
-        productBase64Data.splice(index, 1); // Also remove stored base64 (mobile fix)
     }
 
-    // Rebuild base64 array from remaining files if needed
-    if (productFiles.length === 0) {
-        productBase64Data = [];
-    }
-
-    // Rebuild base64Results array for display
-    var base64Results = productBase64Data.map(function(data, idx) {
+    // Rebuild Object URLs for remaining files
+    var objectUrls = productFiles.map(function(file) {
         return {
-            data: data,
-            name: productFiles[idx] ? productFiles[idx].name : 'Product ' + (idx + 1)
+            url: URL.createObjectURL(file),
+            name: file.name
         };
     });
 
-    displayProductPreviews(base64Results);
+    displayProductPreviews(objectUrls);
 }
 
 /**
@@ -1338,10 +1237,8 @@ async function callGeminiNanoBanana(prompt) {
         if (selectedMode === 'create' && templateFile) {
             try {
                 console.log('[callGeminiNanoBanana] Converting template image...');
-                // Use stored base64 if available (mobile fix), otherwise read file
-                var templateBase64 = templateBase64Data || await fileToBase64(templateFile);
+                var templateBase64 = await fileToBase64(templateFile);
                 console.log('[callGeminiNanoBanana] Template converted, size:', Math.round(templateBase64.length / 1024), 'KB');
-                console.log('[callGeminiNanoBanana] Used stored base64:', templateBase64Data ? 'YES' : 'NO (read from file)');
                 contentParts.push({
                     type: "image_url",
                     image_url: {
@@ -1360,9 +1257,7 @@ async function callGeminiNanoBanana(prompt) {
             for (var j = 0; j < productFiles.length; j++) {
                 try {
                     console.log('[callGeminiNanoBanana] Converting product image', j + 1);
-                    // Use stored base64 if available (mobile fix), otherwise read file
-                    var productBase64 = productBase64Data[j] || await fileToBase64(productFiles[j]);
-                    console.log('[callGeminiNanoBanana] Product', j + 1, 'used stored base64:', productBase64Data[j] ? 'YES' : 'NO (read from file)');
+                    var productBase64 = await fileToBase64(productFiles[j]);
                     contentParts.push({
                         type: "image_url",
                         image_url: {
@@ -1542,10 +1437,6 @@ function resetForm() {
     baseImageFiles = [];
     primaryImageIndex = 0;
 
-    // Clear stored base64 data (mobile fix)
-    templateBase64Data = null;
-    productBase64Data = [];
-
     // Reset file inputs
     document.getElementById('templateInput').value = '';
     if (document.getElementById('productImagesInput')) {
@@ -1579,265 +1470,3 @@ function resetForm() {
     document.getElementById('generationForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/**
- * Refresh page - Clear all form data, uploaded files, and state
- * This provides a complete reset without reloading the page
- */
-function refreshPage() {
-    console.log('[refreshPage] Starting complete page refresh');
-
-    // Clear all state variables
-    templateFile = null;
-    productFiles = [];
-    baseImageFiles = [];
-    primaryImageIndex = 0;
-
-    // Clear stored base64 data (mobile fix)
-    templateBase64Data = null;
-    productBase64Data = [];
-
-    // Clear all form inputs
-    const promptInput = document.getElementById('promptInput');
-    if (promptInput) {
-        promptInput.value = '';
-    }
-
-    // Reset aspect ratio to default for flyers (2:3 portrait)
-    const aspectRatioSelect = document.getElementById('aspectRatioSelect');
-    if (aspectRatioSelect) {
-        aspectRatioSelect.value = '2:3';
-    }
-
-    // Clear all file inputs
-    const templateInput = document.getElementById('templateInput');
-    if (templateInput) {
-        templateInput.value = '';
-    }
-
-    const productImagesInput = document.getElementById('productImagesInput');
-    if (productImagesInput) {
-        productImagesInput.value = '';
-    }
-
-    const baseImageInput = document.getElementById('baseImageInput');
-    if (baseImageInput) {
-        baseImageInput.value = '';
-    }
-
-    // Reset template upload area
-    const templateUploadLabel = document.getElementById('templateUploadLabel');
-    if (templateUploadLabel) {
-        templateUploadLabel.style.display = 'flex';
-    }
-
-    const templatePreview = document.getElementById('templatePreview');
-    if (templatePreview) {
-        templatePreview.style.display = 'none';
-        const templatePreviewImg = document.getElementById('templatePreviewImg');
-        if (templatePreviewImg) {
-            // Remove event handlers to prevent errors when clearing src
-            templatePreviewImg.onload = null;
-            templatePreviewImg.onerror = null;
-
-            // Revoke object URL if it exists
-            if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
-                try {
-                    URL.revokeObjectURL(templatePreviewImg.src);
-                } catch (e) {
-                    console.log('[refreshPage] Error revoking template URL:', e);
-                }
-            }
-            templatePreviewImg.src = '';
-        }
-    }
-
-    // Reset product images area
-    const productPreviews = document.getElementById('productPreviews');
-    if (productPreviews) {
-        // Revoke all object URLs before clearing
-        const productImages = productPreviews.querySelectorAll('img[data-object-url="true"]');
-        for (let i = 0; i < productImages.length; i++) {
-            try {
-                URL.revokeObjectURL(productImages[i].src);
-            } catch (e) {
-                console.log('[refreshPage] Error revoking product URL:', e);
-            }
-        }
-        productPreviews.innerHTML = '';
-    }
-
-    const productUploadPlaceholder = document.getElementById('productUploadPlaceholder');
-    if (productUploadPlaceholder) {
-        productUploadPlaceholder.style.display = 'flex';
-    }
-
-    const productPreviewsInline = document.getElementById('productPreviewsInline');
-    if (productPreviewsInline) {
-        productPreviewsInline.style.display = 'none';
-    }
-
-    const productCount = document.getElementById('productCount');
-    if (productCount) {
-        productCount.style.display = 'none';
-        productCount.textContent = '0';
-    }
-
-    // Reset base image previews (for edit mode)
-    const baseImagePreviews = document.getElementById('baseImagePreviews');
-    if (baseImagePreviews) {
-        // Revoke all object URLs before clearing
-        const baseImages = baseImagePreviews.querySelectorAll('img[data-object-url="true"]');
-        for (let i = 0; i < baseImages.length; i++) {
-            try {
-                URL.revokeObjectURL(baseImages[i].src);
-            } catch (e) {
-                console.log('[refreshPage] Error revoking base image URL:', e);
-            }
-        }
-        baseImagePreviews.innerHTML = '';
-    }
-
-    const baseImageUploadArea = document.getElementById('baseImageUploadArea');
-    if (baseImageUploadArea) {
-        const uploadPlaceholder = baseImageUploadArea.querySelector('.upload-placeholder');
-        if (uploadPlaceholder) {
-            uploadPlaceholder.style.display = 'flex';
-        }
-    }
-
-    // Hide and clear result section
-    const resultSection = document.getElementById('resultSection');
-    if (resultSection) {
-        resultSection.style.display = 'none';
-    }
-
-    const generatedImage = document.getElementById('generatedImage');
-    if (generatedImage) {
-        // Remove event handlers to prevent errors when clearing src
-        generatedImage.onload = null;
-        generatedImage.onerror = null;
-
-        // Revoke object URL if it exists
-        if (generatedImage.src && generatedImage.src.startsWith('blob:')) {
-            try {
-                URL.revokeObjectURL(generatedImage.src);
-            } catch (e) {
-                console.log('[refreshPage] Error revoking generated image URL:', e);
-            }
-        }
-        generatedImage.src = '';
-    }
-
-    // Hide loading container
-    const loadingContainer = document.getElementById('loadingContainer');
-    if (loadingContainer) {
-        loadingContainer.style.display = 'none';
-    }
-
-    // Clear localStorage related to image creator
-    try {
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
-                keysToRemove.push(key);
-            }
-        }
-        keysToRemove.forEach(key => {
-            localStorage.removeItem(key);
-            console.log('[refreshPage] Removed localStorage key:', key);
-        });
-    } catch (e) {
-        console.log('[refreshPage] Error clearing localStorage:', e);
-    }
-
-    // Clear sessionStorage related to image creator
-    try {
-        const sessionKeysToRemove = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
-                sessionKeysToRemove.push(key);
-            }
-        }
-        sessionKeysToRemove.forEach(key => {
-            sessionStorage.removeItem(key);
-            console.log('[refreshPage] Removed sessionStorage key:', key);
-        });
-    } catch (e) {
-        console.log('[refreshPage] Error clearing sessionStorage:', e);
-    }
-
-    // Show success feedback with animation
-    showRefreshFeedback();
-
-    // Scroll to top of page smoothly
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    console.log('[refreshPage] Page refresh complete');
-}
-
-/**
- * Show visual feedback when refresh is complete
- */
-function showRefreshFeedback() {
-    // Create feedback element
-    const feedback = document.createElement('div');
-    feedback.className = 'refresh-feedback';
-    feedback.innerHTML = '<i class="fas fa-check-circle me-2"></i>Page refreshed successfully!';
-    feedback.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-        z-index: 9999;
-        font-weight: 600;
-        animation: slideInRight 0.3s ease-out;
-    `;
-
-    // Add animation keyframes if not already added
-    if (!document.getElementById('refreshFeedbackStyles')) {
-        const style = document.createElement('style');
-        style.id = 'refreshFeedbackStyles';
-        style.textContent = `
-            @keyframes slideInRight {
-                from {
-                    transform: translateX(400px);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
-            @keyframes slideOutRight {
-                from {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translateX(400px);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // Add to page
-    document.body.appendChild(feedback);
-
-    // Remove after 2.5 seconds with animation
-    setTimeout(() => {
-        feedback.style.animation = 'slideOutRight 0.3s ease-in';
-        setTimeout(() => {
-            if (feedback.parentNode) {
-                feedback.parentNode.removeChild(feedback);
-            }
-        }, 300);
-    }, 2500);
-}
