@@ -151,59 +151,49 @@ document.addEventListener('DOMContentLoaded', function() {
             const file = e.target.files[0];
             if (!file) return;
 
-            // DEBUG: File selected
-            alert('[DEBUG 1] Template file selected:\nName: ' + file.name + '\nSize: ' + Math.round(file.size / 1024) + ' KB\nType: ' + file.type);
-
             if (!isValidImageFile(file)) {
-                alert('[DEBUG 2] Validation FAILED: Invalid file type');
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
                 e.target.value = '';
                 return;
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                alert('[DEBUG 3] Validation FAILED: File too large (> 5MB)');
+                alert('File size must be less than 5MB');
                 e.target.value = '';
                 return;
             }
 
             if (file.size === 0) {
-                alert('[DEBUG 4] Validation FAILED: File size is 0');
+                alert('The selected file appears to be empty or corrupted.');
                 e.target.value = '';
                 return;
             }
 
-            // DEBUG: Validation passed
-            alert('[DEBUG 5] Validation PASSED. Reading file IMMEDIATELY...');
-
             // Store file reference for later API use
             templateFile = file;
-
-            // DEBUG: Creating FileReader immediately
-            alert('[DEBUG 6] Creating FileReader in event handler (while file ref is valid)...');
 
             // Read file IMMEDIATELY while reference is valid (mobile fix)
             var reader = new FileReader();
 
             reader.onload = function(e) {
                 if (e.target && e.target.result) {
-                    alert('[DEBUG 7] FileReader SUCCESS in event handler!\nResult size: ' + Math.round(e.target.result.length / 1024) + ' KB\nCalling displayTemplatePreview()...');
                     // Pass base64 result, not File object
                     displayTemplatePreview(e.target.result, file.name);
                 } else {
-                    alert('[DEBUG 8] ERROR: FileReader result is NULL');
+                    alert('Failed to load image. Please try again.');
                 }
             };
 
             reader.onerror = function(err) {
-                var errorMsg = reader.error ? (reader.error.message || reader.error.name || 'Unknown') : 'Unknown';
-                alert('[DEBUG 9] FileReader ERROR in event handler!\nError: ' + errorMsg + '\nFile: ' + file.name);
+                console.error('FileReader error:', err, reader.error);
+                alert('Failed to read image. Please try a different file.');
             };
 
             try {
-                alert('[DEBUG 10] Calling readAsDataURL() in event handler...');
                 reader.readAsDataURL(file);
             } catch (e) {
-                alert('[DEBUG 11] EXCEPTION in event handler!\nError: ' + e.message);
+                console.error('Exception reading file:', e);
+                alert('Error reading file. Please try again.');
             }
         });
     }
@@ -227,55 +217,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const file = e.dataTransfer.files[0];
             if (!file) return;
 
-            // DEBUG: File dropped
-            alert('[DEBUG DRAG 1] Template file dropped:\nName: ' + file.name + '\nSize: ' + Math.round(file.size / 1024) + ' KB\nType: ' + file.type);
-
             if (!isValidImageFile(file)) {
-                alert('[DEBUG DRAG 2] Validation FAILED: Invalid file type');
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
                 return;
             }
 
             if (file.size > 5 * 1024 * 1024) {
-                alert('[DEBUG DRAG 3] Validation FAILED: File too large');
+                alert('File size must be less than 5MB');
                 return;
             }
 
             if (file.size === 0) {
-                alert('[DEBUG DRAG 4] Validation FAILED: File size is 0');
+                alert('The selected file appears to be empty or corrupted.');
                 return;
             }
 
-            // DEBUG: Validation passed
-            alert('[DEBUG DRAG 5] Validation PASSED. Reading file IMMEDIATELY...');
-
             // Store file reference for later API use
             templateFile = file;
-
-            // DEBUG: Creating FileReader immediately
-            alert('[DEBUG DRAG 6] Creating FileReader in event handler...');
 
             // Read file IMMEDIATELY while reference is valid (mobile fix)
             var reader = new FileReader();
 
             reader.onload = function(e) {
                 if (e.target && e.target.result) {
-                    alert('[DEBUG DRAG 7] FileReader SUCCESS!\nCalling displayTemplatePreview()...');
                     displayTemplatePreview(e.target.result, file.name);
                 } else {
-                    alert('[DEBUG DRAG 8] ERROR: FileReader result is NULL');
+                    alert('Failed to load image. Please try again.');
                 }
             };
 
             reader.onerror = function(err) {
-                var errorMsg = reader.error ? (reader.error.message || 'Unknown') : 'Unknown';
-                alert('[DEBUG DRAG 9] FileReader ERROR!\nError: ' + errorMsg);
+                console.error('FileReader error:', err, reader.error);
+                alert('Failed to read image. Please try a different file.');
             };
 
             try {
-                alert('[DEBUG DRAG 10] Calling readAsDataURL()...');
                 reader.readAsDataURL(file);
             } catch (e) {
-                alert('[DEBUG DRAG 11] EXCEPTION!\nError: ' + e.message);
+                console.error('Exception reading file:', e);
+                alert('Error reading file. Please try again.');
             }
         });
     }
@@ -286,37 +266,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (productImagesInput) {
         productImagesInput.addEventListener('change', function(e) {
-            // DEBUG: Files selected
-            alert('[DEBUG PROD 1] Product files selected: ' + e.target.files.length + ' file(s)');
-
             var files = Array.from(e.target.files);
             var filesToProcess = [];
 
             // Validate all files first
-            files.forEach(function(file, idx) {
-                alert('[DEBUG PROD 2.' + idx + '] Validating file ' + (idx + 1) + ':\nName: ' + file.name + '\nSize: ' + Math.round(file.size / 1024) + ' KB');
-
+            files.forEach(function(file) {
                 if (!isValidImageFile(file)) {
-                    alert('[DEBUG PROD 3.' + idx + '] Validation FAILED: Invalid type');
+                    alert('Invalid file type: ' + file.name);
                     return;
                 }
                 if (file.size > 5 * 1024 * 1024) {
-                    alert('[DEBUG PROD 4.' + idx + '] Validation FAILED: Too large');
+                    alert('File size must be less than 5MB: ' + file.name);
                     return;
                 }
 
-                alert('[DEBUG PROD 5.' + idx + '] Validation PASSED');
                 filesToProcess.push(file);
                 productFiles.push(file); // Store File object for API use
             });
 
             if (filesToProcess.length === 0) {
-                alert('[DEBUG PROD 6] No valid files to process');
                 return;
             }
-
-            // DEBUG: Reading files immediately
-            alert('[DEBUG PROD 7] Reading ' + filesToProcess.length + ' file(s) IMMEDIATELY...');
 
             // Read all files immediately while references are valid
             var base64Results = [];
@@ -327,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 reader.onload = function(e) {
                     if (e.target && e.target.result) {
-                        alert('[DEBUG PROD 8.' + idx + '] File ' + (idx + 1) + ' read SUCCESS');
                         base64Results[idx] = {
                             data: e.target.result,
                             name: file.name
@@ -336,23 +305,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // When all files are read, display previews
                         if (filesRead === filesToProcess.length) {
-                            alert('[DEBUG PROD 9] All ' + filesRead + ' files read. Calling displayProductPreviews()...');
                             displayProductPreviews(base64Results);
                         }
                     } else {
-                        alert('[DEBUG PROD 10.' + idx + '] ERROR: Result is NULL for file ' + (idx + 1));
+                        console.error('FileReader result is null for file:', file.name);
+                        alert('Failed to load image: ' + file.name);
                     }
                 };
 
                 reader.onerror = function(err) {
-                    var errorMsg = reader.error ? (reader.error.message || 'Unknown') : 'Unknown';
-                    alert('[DEBUG PROD 11.' + idx + '] FileReader ERROR for file ' + (idx + 1) + '!\nError: ' + errorMsg);
+                    console.error('FileReader error for file:', file.name, err, reader.error);
+                    alert('Failed to read image: ' + file.name);
                 };
 
                 try {
                     reader.readAsDataURL(file);
                 } catch (e) {
-                    alert('[DEBUG PROD 12.' + idx + '] EXCEPTION reading file ' + (idx + 1) + '!\nError: ' + e.message);
+                    console.error('Exception reading file:', file.name, e);
+                    alert('Error reading file: ' + file.name);
                 }
             });
         });
@@ -374,37 +344,27 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
 
-            // DEBUG: Files dropped
-            alert('[DEBUG PROD DRAG 1] Product files dropped: ' + e.dataTransfer.files.length + ' file(s)');
-
             var files = Array.from(e.dataTransfer.files);
             var filesToProcess = [];
 
             // Validate all files first
-            files.forEach(function(file, idx) {
-                alert('[DEBUG PROD DRAG 2.' + idx + '] Validating file ' + (idx + 1) + ':\nName: ' + file.name);
-
+            files.forEach(function(file) {
                 if (!isValidImageFile(file)) {
-                    alert('[DEBUG PROD DRAG 3.' + idx + '] Validation FAILED: Invalid type');
+                    alert('Invalid file type: ' + file.name);
                     return;
                 }
                 if (file.size > 5 * 1024 * 1024) {
-                    alert('[DEBUG PROD DRAG 4.' + idx + '] Validation FAILED: Too large');
+                    alert('File size must be less than 5MB: ' + file.name);
                     return;
                 }
 
-                alert('[DEBUG PROD DRAG 5.' + idx + '] Validation PASSED');
                 filesToProcess.push(file);
                 productFiles.push(file); // Store File object for API use
             });
 
             if (filesToProcess.length === 0) {
-                alert('[DEBUG PROD DRAG 6] No valid files to process');
                 return;
             }
-
-            // DEBUG: Reading files immediately
-            alert('[DEBUG PROD DRAG 7] Reading ' + filesToProcess.length + ' file(s) IMMEDIATELY...');
 
             // Read all files immediately while references are valid
             var base64Results = [];
@@ -415,7 +375,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 reader.onload = function(e) {
                     if (e.target && e.target.result) {
-                        alert('[DEBUG PROD DRAG 8.' + idx + '] File ' + (idx + 1) + ' read SUCCESS');
                         base64Results[idx] = {
                             data: e.target.result,
                             name: file.name
@@ -424,23 +383,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // When all files are read, display previews
                         if (filesRead === filesToProcess.length) {
-                            alert('[DEBUG PROD DRAG 9] All files read. Calling displayProductPreviews()...');
                             displayProductPreviews(base64Results);
                         }
                     } else {
-                        alert('[DEBUG PROD DRAG 10.' + idx + '] ERROR: Result is NULL');
+                        console.error('FileReader result is null for file:', file.name);
+                        alert('Failed to load image: ' + file.name);
                     }
                 };
 
                 reader.onerror = function(err) {
-                    var errorMsg = reader.error ? (reader.error.message || 'Unknown') : 'Unknown';
-                    alert('[DEBUG PROD DRAG 11.' + idx + '] FileReader ERROR!\nError: ' + errorMsg);
+                    console.error('FileReader error for file:', file.name, err, reader.error);
+                    alert('Failed to read image: ' + file.name);
                 };
 
                 try {
                     reader.readAsDataURL(file);
                 } catch (e) {
-                    alert('[DEBUG PROD DRAG 12.' + idx + '] EXCEPTION!\nError: ' + e.message);
+                    console.error('Exception reading file:', file.name, e);
+                    alert('Error reading file: ' + file.name);
                 }
             });
         });
@@ -540,29 +500,20 @@ document.addEventListener('DOMContentLoaded', function() {
  * Display template preview - receives base64 data URL (mobile fix)
  */
 function displayTemplatePreview(base64DataUrl, fileName) {
-    // DEBUG: Function called
-    alert('[DEBUG 12] displayTemplatePreview() called\nFileName: ' + fileName + '\nData size: ' + Math.round(base64DataUrl.length / 1024) + ' KB');
-
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
 
     if (!templatePreviewImg) {
-        alert('[DEBUG 13] ERROR: Preview element not found!');
+        alert('Error: Preview element not found. Please refresh the page.');
         return;
     }
-
-    // DEBUG: Elements found
-    alert('[DEBUG 14] DOM elements found OK');
 
     // Validate base64 data
     if (!base64DataUrl || typeof base64DataUrl !== 'string') {
-        alert('[DEBUG 15] ERROR: Invalid base64 data\nType: ' + typeof base64DataUrl);
+        alert('Invalid image data. Please try again.');
         return;
     }
-
-    // DEBUG: Validation passed
-    alert('[DEBUG 16] Data validation PASSED. Setting image src...');
 
     // Hide upload label, show preview container
     if (uploadLabel) uploadLabel.style.display = 'none';
@@ -571,9 +522,9 @@ function displayTemplatePreview(base64DataUrl, fileName) {
     // Set image src directly (no FileReader needed - already read in event handler)
     try {
         templatePreviewImg.src = base64DataUrl;
-        alert('[DEBUG 17] Image src set successfully!');
     } catch (e) {
-        alert('[DEBUG 18] ERROR setting img.src!\nError: ' + e.message);
+        console.error('Error setting image src:', e);
+        alert('Error displaying image. Please try again.');
     }
 }
 
@@ -736,28 +687,18 @@ function removeBaseImage(index) {
  * Display product image previews - receives base64 data (mobile fix)
  */
 function displayProductPreviews(base64Results) {
-    // DEBUG: Function called
-    alert('[DEBUG PROD 13] displayProductPreviews() called\nBase64 results: ' + (base64Results ? base64Results.length : 0));
-
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
     var placeholder = document.getElementById('productUploadPlaceholder');
     var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
-    if (!container) {
-        alert('[DEBUG PROD 14] ERROR: Container not found!');
-        return;
-    }
-
-    // DEBUG: Container found
-    alert('[DEBUG PROD 15] Container found. Clearing existing previews...');
+    if (!container) return;
 
     container.innerHTML = '';
 
     // Show/hide elements based on whether there are results
     if (!base64Results || base64Results.length === 0) {
-        alert('[DEBUG PROD 16] No results to display. Showing placeholder.');
         if (placeholder) placeholder.style.display = 'flex';
         if (previewsInline) previewsInline.style.display = 'none';
         if (uploadArea) uploadArea.classList.remove('has-images');
@@ -767,9 +708,6 @@ function displayProductPreviews(base64Results) {
         }
         return;
     }
-
-    // DEBUG: Results exist
-    alert('[DEBUG PROD 17] Results exist (' + base64Results.length + '). Updating UI...');
 
     // Hide placeholder, show inline previews
     if (placeholder) placeholder.style.display = 'none';
@@ -782,15 +720,9 @@ function displayProductPreviews(base64Results) {
         productCountSpan.textContent = base64Results.length;
     }
 
-    // DEBUG: Starting loop
-    alert('[DEBUG PROD 18] Creating preview elements for ' + base64Results.length + ' file(s)...');
-
     // Create preview for each base64 result
     for (var i = 0; i < base64Results.length; i++) {
         (function(index, result) {
-            // DEBUG: Processing result
-            alert('[DEBUG PROD 19.' + index + '] Creating preview for file ' + (index + 1) + ':\nName: ' + result.name);
-
             var div = document.createElement('div');
             div.className = 'product-preview-item';
             div.setAttribute('data-index', index);
@@ -801,9 +733,8 @@ function displayProductPreviews(base64Results) {
             // Set image src directly (already read in event handler)
             try {
                 img.src = result.data;
-                alert('[DEBUG PROD 20.' + index + '] Image src set for file ' + (index + 1));
             } catch (e) {
-                alert('[DEBUG PROD 21.' + index + '] ERROR setting img.src!\nError: ' + e.message);
+                console.error('Error setting image src:', e);
             }
 
             div.appendChild(img);
@@ -829,14 +760,8 @@ function displayProductPreviews(base64Results) {
 
             div.appendChild(removeBtn);
             container.appendChild(div);
-
-            // DEBUG: Preview added to DOM
-            alert('[DEBUG PROD 22.' + index + '] Preview added to container for file ' + (index + 1));
         })(i, base64Results[i]);
     }
-
-    // DEBUG: Loop complete
-    alert('[DEBUG PROD 23] All ' + base64Results.length + ' preview(s) created successfully!');
 }
 
 /**
