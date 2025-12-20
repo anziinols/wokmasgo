@@ -91,76 +91,97 @@ function isHeicFile(file) {
  * - blob: The JPEG blob for creating File objects
  * - base64: The base64 data URL for preview display
  * - file: A new File object with .jpg extension
+ *
+ * Mobile-compatible: Uses FileReader instead of URL.createObjectURL for better compatibility
  */
 function convertImageToJpeg(file) {
     return new Promise(function(resolve, reject) {
         if (!file) {
+            console.error('[convertImageToJpeg] No file provided');
             reject(new Error('No file provided'));
             return;
         }
 
-        console.log('[convertImageToJpeg] Converting:', file.name, 'Type:', file.type);
+        console.log('[convertImageToJpeg] Starting conversion:', file.name, 'Type:', file.type, 'Size:', file.size);
 
-        // Helper function to convert blob to JPEG using Canvas
-        function processWithCanvas(imageBlob) {
+        // Helper function to convert base64 data URL to JPEG using Canvas
+        function processWithCanvas(dataUrl, originalFile) {
+            console.log('[convertImageToJpeg] Processing with Canvas...');
+
             var img = new Image();
-            var objectUrl = URL.createObjectURL(imageBlob);
 
             img.onload = function() {
-                // Create canvas with image dimensions
-                var canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
+                console.log('[convertImageToJpeg] Image loaded, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
 
-                var ctx = canvas.getContext('2d');
-                // Fill with white background (for transparency in PNG/GIF)
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                // Draw the image
-                ctx.drawImage(img, 0, 0);
+                try {
+                    // Create canvas with image dimensions
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
 
-                // Revoke the object URL to free memory
-                URL.revokeObjectURL(objectUrl);
-
-                // Convert canvas to JPEG blob
-                canvas.toBlob(function(jpegBlob) {
-                    if (!jpegBlob) {
-                        reject(new Error('Failed to convert image to JPEG'));
+                    var ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.error('[convertImageToJpeg] Failed to get canvas context');
+                        reject(new Error('Canvas not supported'));
                         return;
                     }
 
-                    // Create a new File object with .jpg extension
-                    var originalName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
-                    var newFileName = originalName + '.jpg';
-                    var jpegFile = new File([jpegBlob], newFileName, { type: 'image/jpeg' });
+                    // Fill with white background (for transparency in PNG/GIF)
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    // Draw the image
+                    ctx.drawImage(img, 0, 0);
 
-                    // Convert to base64 for preview
-                    var reader = new FileReader();
-                    reader.onload = function(e) {
-                        console.log('[convertImageToJpeg] Conversion complete:', newFileName);
-                        resolve({
-                            blob: jpegBlob,
-                            base64: e.target.result,
-                            file: jpegFile,
-                            originalName: file.name
-                        });
-                    };
-                    reader.onerror = function(err) {
-                        console.error('[convertImageToJpeg] FileReader error:', err);
-                        reject(err);
-                    };
-                    reader.readAsDataURL(jpegBlob);
+                    console.log('[convertImageToJpeg] Canvas drawn, converting to JPEG blob...');
 
-                }, 'image/jpeg', 0.8); // 80% quality
+                    // Convert canvas to JPEG blob
+                    canvas.toBlob(function(jpegBlob) {
+                        if (!jpegBlob) {
+                            console.error('[convertImageToJpeg] toBlob returned null');
+                            reject(new Error('Failed to convert canvas to JPEG blob'));
+                            return;
+                        }
+
+                        console.log('[convertImageToJpeg] JPEG blob created, size:', jpegBlob.size);
+
+                        // Create a new File object with .jpg extension
+                        var originalName = originalFile.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                        var newFileName = originalName + '.jpg';
+                        var jpegFile = new File([jpegBlob], newFileName, { type: 'image/jpeg' });
+
+                        // Convert to base64 for preview
+                        var reader = new FileReader();
+                        reader.onload = function(e) {
+                            console.log('[convertImageToJpeg] Conversion complete:', newFileName);
+                            resolve({
+                                blob: jpegBlob,
+                                base64: e.target.result,
+                                file: jpegFile,
+                                originalName: originalFile.name
+                            });
+                        };
+                        reader.onerror = function(err) {
+                            console.error('[convertImageToJpeg] FileReader error on final base64:', err);
+                            reject(new Error('Failed to create base64 preview'));
+                        };
+                        reader.readAsDataURL(jpegBlob);
+
+                    }, 'image/jpeg', 0.8); // 80% quality
+
+                } catch (canvasError) {
+                    console.error('[convertImageToJpeg] Canvas processing error:', canvasError);
+                    reject(canvasError);
+                }
             };
 
             img.onerror = function(e) {
-                URL.revokeObjectURL(objectUrl);
-                console.error('[convertImageToJpeg] Failed to load image:', e);
+                console.error('[convertImageToJpeg] Failed to load image into Image element:', e);
                 reject(new Error('Failed to load image for conversion'));
             };
 
-            img.src = objectUrl;
+            // Set crossOrigin to anonymous to avoid CORS issues
+            img.crossOrigin = 'anonymous';
+            img.src = dataUrl;
         }
 
         // Check if HEIC/HEIF - need to convert first using heic2any
@@ -168,8 +189,8 @@ function convertImageToJpeg(file) {
             console.log('[convertImageToJpeg] HEIC file detected, using heic2any first...');
 
             if (typeof heic2any === 'undefined') {
-                console.error('[convertImageToJpeg] heic2any library not loaded');
-                reject(new Error('HEIC conversion library not available'));
+                console.error('[convertImageToJpeg] heic2any library not loaded! Check CDN.');
+                reject(new Error('HEIC conversion library not available. Please check your internet connection.'));
                 return;
             }
 
@@ -178,13 +199,14 @@ function convertImageToJpeg(file) {
                 toType: 'image/jpeg',
                 quality: 0.8
             }).then(function(convertedBlob) {
-                console.log('[convertImageToJpeg] HEIC converted, now processing...');
+                console.log('[convertImageToJpeg] HEIC converted by heic2any, size:', convertedBlob.size);
                 // For HEIC, heic2any already gives us JPEG, just need base64
                 var reader = new FileReader();
                 reader.onload = function(e) {
                     var originalName = file.name.replace(/\.[^/.]+$/, '');
                     var newFileName = originalName + '.jpg';
                     var jpegFile = new File([convertedBlob], newFileName, { type: 'image/jpeg' });
+                    console.log('[convertImageToJpeg] HEIC conversion complete:', newFileName);
                     resolve({
                         blob: convertedBlob,
                         base64: e.target.result,
@@ -193,16 +215,27 @@ function convertImageToJpeg(file) {
                     });
                 };
                 reader.onerror = function(err) {
-                    reject(err);
+                    console.error('[convertImageToJpeg] FileReader error on HEIC base64:', err);
+                    reject(new Error('Failed to read converted HEIC image'));
                 };
                 reader.readAsDataURL(convertedBlob);
             }).catch(function(err) {
                 console.error('[convertImageToJpeg] HEIC conversion failed:', err);
-                reject(err);
+                reject(new Error('Failed to convert HEIC image: ' + (err.message || err)));
             });
         } else {
-            // Standard format - process with Canvas
-            processWithCanvas(file);
+            // Standard format - read file as data URL first (more reliable on mobile)
+            console.log('[convertImageToJpeg] Reading file as data URL...');
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('[convertImageToJpeg] File read complete, processing with canvas...');
+                processWithCanvas(e.target.result, file);
+            };
+            reader.onerror = function(err) {
+                console.error('[convertImageToJpeg] FileReader error:', err);
+                reject(new Error('Failed to read image file'));
+            };
+            reader.readAsDataURL(file);
         }
     });
 }
@@ -374,16 +407,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Convert image to JPEG and get base64 for preview
-            console.log('[Template Upload] Converting to JPEG:', file.name);
+            console.log('[Template Upload] Converting to JPEG:', file.name, 'Type:', file.type, 'Size:', file.size);
             try {
                 var result = await convertImageToJpeg(file);
                 // Store converted JPEG file for API use
                 templateFile = result.file;
+                console.log('[Template Upload] Conversion successful, displaying preview...');
                 // Display preview using base64
                 displayTemplatePreview(result.base64, result.file.name);
             } catch (err) {
                 console.error('[Template Upload] Conversion failed:', err);
-                alert('Failed to process image. Please try another file.');
+                var errorMsg = err.message || 'Unknown error';
+                alert('Failed to process image: ' + errorMsg + '\n\nPlease try another file or a different format.');
             }
         });
     }
@@ -423,16 +458,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Convert image to JPEG and get base64 for preview
-            console.log('[Template Drag-Drop] Converting to JPEG:', file.name);
+            console.log('[Template Drag-Drop] Converting to JPEG:', file.name, 'Type:', file.type, 'Size:', file.size);
             try {
                 var result = await convertImageToJpeg(file);
                 // Store converted JPEG file for API use
                 templateFile = result.file;
+                console.log('[Template Drag-Drop] Conversion successful, displaying preview...');
                 // Display preview using base64
                 displayTemplatePreview(result.base64, result.file.name);
             } catch (err) {
                 console.error('[Template Drag-Drop] Conversion failed:', err);
-                alert('Failed to process image. Please try another file.');
+                var errorMsg = err.message || 'Unknown error';
+                alert('Failed to process image: ' + errorMsg + '\n\nPlease try another file or a different format.');
             }
         });
     }
