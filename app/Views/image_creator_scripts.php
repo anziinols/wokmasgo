@@ -16,41 +16,25 @@ function isMobileDevice() {
 }
 
 /**
- * Validate if file is a supported image format
- * More lenient check for mobile browsers that may report different MIME types
+ * Validate if file is a supported image format - simplified
  */
 function isValidImageFile(file) {
-    if (!file) {
-        console.log('[isValidImageFile] No file provided');
-        return false;
-    }
+    if (!file) return false;
 
     var fileType = file.type ? file.type.toLowerCase() : '';
     var fileName = file.name ? file.name.toLowerCase() : '';
 
-    console.log('[isValidImageFile] Validating file:', fileName);
-    console.log('[isValidImageFile] MIME type:', fileType || '(empty)');
-
     // Check MIME type
-    var validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif'];
+    var validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (fileType && validTypes.includes(fileType)) {
-        console.log('[isValidImageFile] ✓ Valid MIME type:', fileType);
         return true;
     }
 
-    // Fallback: check file extension for mobile browsers that may not report correct MIME type
-    var validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.heic', '.heif'];
-    var hasValidExtension = validExtensions.some(function(ext) {
+    // Fallback: check file extension
+    var validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
+    return validExtensions.some(function(ext) {
         return fileName.endsWith(ext);
     });
-
-    if (hasValidExtension) {
-        console.log('[isValidImageFile] ✓ Valid file extension (MIME type was:', fileType || 'empty', ')');
-        return true;
-    }
-
-    console.log('[isValidImageFile] ✗ Invalid file - MIME type:', fileType, 'Extension:', fileName.substring(fileName.lastIndexOf('.')));
-    return false;
 }
 
 /**
@@ -162,65 +146,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const templateInput = document.getElementById('templateInput');
     const templateUploadArea = document.getElementById('templateUploadArea');
 
-    console.log('[Template Upload] Initializing template upload handlers');
-    console.log('[Template Upload] templateInput found:', !!templateInput);
-    console.log('[Template Upload] templateUploadArea found:', !!templateUploadArea);
-
     if (templateInput) {
-        console.log('[Template Upload] Attaching change event listener to templateInput');
         templateInput.addEventListener('change', function(e) {
-            console.log('[templateInput] ========================================');
-            console.log('[templateInput] Change event triggered');
-            console.log('[templateInput] Files selected:', e.target.files.length);
-            console.log('[templateInput] Current templateFile:', templateFile ? templateFile.name : 'null');
-            console.log('[templateInput] Current productFiles array length:', productFiles.length);
-
             const file = e.target.files[0];
+            if (!file) return;
 
-            if (!file) {
-                console.log('[templateInput] No file selected');
+            if (!isValidImageFile(file)) {
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
+                e.target.value = '';
                 return;
             }
 
-            console.log('[templateInput] File details:');
-            console.log('[templateInput] - Name:', file.name);
-            console.log('[templateInput] - Size:', Math.round(file.size / 1024), 'KB');
-            console.log('[templateInput] - Type:', file.type);
-            console.log('[templateInput] - Last modified:', new Date(file.lastModified).toISOString());
-
-            var isValid = isValidImageFile(file);
-            console.log('[templateInput] File validation result:', isValid);
-
-            if (file && isValid) {
-                if (file.size > 5 * 1024 * 1024) {
-                    console.warn('[templateInput] File too large:', Math.round(file.size / 1024), 'KB');
-                    alert('File size must be less than 5MB');
-                    e.target.value = ''; // Clear the input
-                    return;
-                }
-
-                // Validate file is actually readable
-                if (file.size === 0) {
-                    console.error('[templateInput] File size is 0 - file may be corrupted');
-                    alert('The selected file appears to be empty or corrupted. Please try a different file.');
-                    e.target.value = ''; // Clear the input
-                    return;
-                }
-
-                console.log('[templateInput] File accepted, setting templateFile and calling displayTemplatePreview');
-                console.log('[templateInput] File instanceof File:', file instanceof File);
-                console.log('[templateInput] File instanceof Blob:', file instanceof Blob);
-
-                templateFile = file;
-                displayTemplatePreview(file);
-            } else if (file) {
-                console.error('[templateInput] Invalid file type:', file.type, 'for file:', file.name);
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
-                e.target.value = ''; // Clear the input
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                e.target.value = '';
+                return;
             }
+
+            if (file.size === 0) {
+                alert('The selected file appears to be empty or corrupted.');
+                e.target.value = '';
+                return;
+            }
+
+            templateFile = file;
+            displayTemplatePreview(file);
         });
-    } else {
-        console.error('[Template Upload] templateInput element not found!');
     }
 
     // Drag and drop for template
@@ -239,90 +190,49 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
 
-            console.log('[templateUploadArea] Drop event triggered');
-            console.log('[templateUploadArea] Files dropped:', e.dataTransfer.files.length);
-
             const file = e.dataTransfer.files[0];
+            if (!file) return;
 
-            if (!file) {
-                console.log('[templateUploadArea] No file in drop event');
+            if (!isValidImageFile(file)) {
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
                 return;
             }
 
-            console.log('[templateUploadArea] File details:');
-            console.log('[templateUploadArea] - Name:', file.name);
-            console.log('[templateUploadArea] - Size:', Math.round(file.size / 1024), 'KB');
-            console.log('[templateUploadArea] - Type:', file.type);
-
-            var isValid = isValidImageFile(file);
-            console.log('[templateUploadArea] File validation result:', isValid);
-
-            if (file && isValid) {
-                if (file.size > 5 * 1024 * 1024) {
-                    console.warn('[templateUploadArea] File too large:', Math.round(file.size / 1024), 'KB');
-                    alert('File size must be less than 5MB');
-                    return;
-                }
-
-                // Validate file is actually readable
-                if (file.size === 0) {
-                    console.error('[templateUploadArea] File size is 0 - file may be corrupted');
-                    alert('The selected file appears to be empty or corrupted. Please try a different file.');
-                    return;
-                }
-
-                console.log('[templateUploadArea] File accepted, setting templateFile and calling displayTemplatePreview');
-                console.log('[templateUploadArea] File instanceof File:', file instanceof File);
-                console.log('[templateUploadArea] File instanceof Blob:', file instanceof Blob);
-
-                templateFile = file;
-                displayTemplatePreview(file);
-            } else if (file) {
-                console.error('[templateUploadArea] Invalid file type:', file.type, 'for file:', file.name);
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                return;
             }
+
+            if (file.size === 0) {
+                alert('The selected file appears to be empty or corrupted.');
+                return;
+            }
+
+            templateFile = file;
+            displayTemplatePreview(file);
         });
-    } else {
-        console.error('[Template Upload] templateUploadArea element not found!');
     }
 
     // Product images upload
     var productImagesInput = document.getElementById('productImagesInput');
     var productUploadArea = document.getElementById('productUploadArea');
 
-    console.log('[DOMContentLoaded] productImagesInput found:', !!productImagesInput);
-    console.log('[DOMContentLoaded] productUploadArea found:', !!productUploadArea);
-
     if (productImagesInput) {
-        console.log('[Product Upload] Attaching change event listener to productImagesInput');
         productImagesInput.addEventListener('change', function(e) {
-            console.log('[productImagesInput] ========================================');
-            console.log('[productImagesInput] Change event triggered');
-            console.log('[productImagesInput] Files selected:', e.target.files.length);
-            console.log('[productImagesInput] Current productFiles array length:', productFiles.length);
-            console.log('[productImagesInput] Current templateFile:', templateFile ? templateFile.name : 'null');
-
             var files = Array.from(e.target.files);
-            var addedCount = 0;
 
             files.forEach(function(file) {
-                console.log('[productImagesInput] Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
-                if (isValidImageFile(file)) {
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert('File size must be less than 5MB: ' + file.name);
-                        return;
-                    }
-                    productFiles.push(file);
-                    addedCount++;
-                    console.log('[productImagesInput] File added to productFiles');
-                } else {
-                    console.log('[productImagesInput] Invalid file type:', file.type);
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
+                if (!isValidImageFile(file)) {
+                    alert('Invalid file type: ' + file.name);
+                    return;
                 }
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB: ' + file.name);
+                    return;
+                }
+                productFiles.push(file);
             });
 
-            console.log('[productImagesInput] Total productFiles now:', productFiles.length);
-            console.log('[productImagesInput] Calling displayProductPreviews()');
             displayProductPreviews();
         });
     }
@@ -342,26 +252,21 @@ document.addEventListener('DOMContentLoaded', function() {
         productUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
-            console.log('[productUploadArea] Drop event triggered');
 
             var files = Array.from(e.dataTransfer.files);
-            console.log('[productUploadArea] Files dropped:', files.length);
 
             files.forEach(function(file) {
-                console.log('[productUploadArea] Processing file:', file.name);
-                if (isValidImageFile(file)) {
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert('File size must be less than 5MB: ' + file.name);
-                        return;
-                    }
-                    productFiles.push(file);
-                    console.log('[productUploadArea] File added to productFiles');
-                } else {
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
+                if (!isValidImageFile(file)) {
+                    alert('Invalid file type: ' + file.name);
+                    return;
                 }
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB: ' + file.name);
+                    return;
+                }
+                productFiles.push(file);
             });
 
-            console.log('[productUploadArea] Total productFiles now:', productFiles.length);
             displayProductPreviews();
         });
     }
@@ -457,133 +362,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview - Mobile compatible
- * Uses URL.createObjectURL for faster preview rendering
+ * Display template preview - simplified
  */
 function displayTemplatePreview(file) {
-    console.log('[displayTemplatePreview] ========================================');
-    console.log('[displayTemplatePreview] Processing file:', file.name);
-    console.log('[displayTemplatePreview] File size:', Math.round(file.size / 1024), 'KB');
-    console.log('[displayTemplatePreview] File type:', file.type);
-    console.log('[displayTemplatePreview] Is mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
 
-    console.log('[displayTemplatePreview] DOM elements found:');
-    console.log('[displayTemplatePreview] - uploadLabel:', !!uploadLabel);
-    console.log('[displayTemplatePreview] - templatePreview:', !!templatePreview);
-    console.log('[displayTemplatePreview] - templatePreviewImg:', !!templatePreviewImg);
-
     if (!templatePreviewImg) {
-        console.error('[displayTemplatePreview] CRITICAL: templatePreviewImg element not found!');
         alert('Error: Preview element not found. Please refresh the page.');
         return;
     }
 
     // Hide upload label, show preview container
-    if (uploadLabel) {
-        uploadLabel.style.display = 'none';
-        console.log('[displayTemplatePreview] Upload label hidden');
-    }
-    if (templatePreview) {
-        templatePreview.style.display = 'block';
-        console.log('[displayTemplatePreview] Preview container shown');
-    }
+    if (uploadLabel) uploadLabel.style.display = 'none';
+    if (templatePreview) templatePreview.style.display = 'block';
 
-    // Revoke old object URL if exists
-    if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
-        try {
-            URL.revokeObjectURL(templatePreviewImg.src);
-            console.log('[displayTemplatePreview] Revoked old object URL');
-        } catch (e) {
-            console.warn('[displayTemplatePreview] Failed to revoke old URL:', e);
-        }
-    }
+    // Use FileReader to display preview
+    var reader = new FileReader();
 
-    // Clear any existing src to prevent cached errors
-    templatePreviewImg.src = '';
-
-    // Set up event handlers BEFORE setting src (critical for mobile)
-    templatePreviewImg.onload = function() {
-        console.log('[displayTemplatePreview] ✓ Template image loaded successfully');
-        console.log('[displayTemplatePreview] Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
+    reader.onload = function(e) {
+        templatePreviewImg.src = e.target.result;
     };
 
-    // Capture file reference for error handler
-    var fileRef = file;
-
-    templatePreviewImg.onerror = function(errorEvent) {
-        console.error('[displayTemplatePreview] ✗ Failed to load template image');
-        console.error('[displayTemplatePreview] Error event:', errorEvent);
-        console.error('[displayTemplatePreview] Image src:', this.src);
-        console.error('[displayTemplatePreview] Image src type:', this.src.startsWith('blob:') ? 'Object URL' : 'Data URL');
-
-        // Try fallback to FileReader if object URL failed
-        if (this.src.startsWith('blob:')) {
-            console.log('[displayTemplatePreview] Object URL failed, trying FileReader fallback...');
-            var reader = new FileReader();
-            var img = this; // Capture reference
-
-            reader.onload = function(evt) {
-                console.log('[displayTemplatePreview] FileReader loaded, data URL length:', evt.target.result.length);
-                img.src = evt.target.result;
-            };
-
-            reader.onerror = function(err) {
-                console.error('[displayTemplatePreview] FileReader also failed:', err);
-                console.error('[displayTemplatePreview] FileReader error details:', err);
-                alert('Failed to read the image file. Please try a different image or refresh the page.');
-            };
-
-            // Use the captured file reference
-            console.log('[displayTemplatePreview] Reading file with FileReader:', fileRef.name);
-            reader.readAsDataURL(fileRef);
-        } else {
-            alert('Failed to display image preview. Please try again or use a different image.');
-        }
+    reader.onerror = function() {
+        alert('Failed to read image. Please try a different file.');
     };
 
-    // Use object URL for preview (faster than FileReader)
-    try {
-        console.log('[displayTemplatePreview] Attempting to create object URL for file:', file.name);
-        console.log('[displayTemplatePreview] File object valid:', file instanceof File);
-        console.log('[displayTemplatePreview] File size:', file.size, 'bytes');
-
-        var objectUrl = URL.createObjectURL(file);
-        console.log('[displayTemplatePreview] ✓ Created object URL:', objectUrl.substring(0, 50) + '...');
-
-        // Set src AFTER handlers are attached
-        templatePreviewImg.src = objectUrl;
-        console.log('[displayTemplatePreview] Object URL assigned to img.src');
-    } catch (e) {
-        console.error('[displayTemplatePreview] ✗ Failed to create object URL:', e);
-        console.error('[displayTemplatePreview] Error name:', e.name);
-        console.error('[displayTemplatePreview] Error message:', e.message);
-        console.log('[displayTemplatePreview] Using FileReader fallback immediately');
-
-        // Fallback to FileReader
-        var reader = new FileReader();
-        reader.onload = function(evt) {
-            console.log('[displayTemplatePreview] ✓ FileReader successful, data URL length:', evt.target.result.length);
-            templatePreviewImg.src = evt.target.result;
-        };
-        reader.onerror = function(err) {
-            console.error('[displayTemplatePreview] ✗ FileReader error:', err);
-            console.error('[displayTemplatePreview] FileReader error target:', err.target);
-            console.error('[displayTemplatePreview] FileReader error code:', err.target ? err.target.error : 'unknown');
-            alert('Failed to read the image file. Please try a different image or refresh the page.');
-        };
-
-        console.log('[displayTemplatePreview] Starting FileReader.readAsDataURL for file:', file.name);
-        try {
-            reader.readAsDataURL(file);
-        } catch (readErr) {
-            console.error('[displayTemplatePreview] ✗ Exception when calling readAsDataURL:', readErr);
-            alert('Failed to read the image file. The file may be corrupted or inaccessible.');
-        }
-    }
+    reader.readAsDataURL(file);
 }
 
 /**
@@ -742,50 +548,21 @@ function removeBaseImage(index) {
 }
 
 /**
- * Display product image previews - Mobile compatible
- * Previews are shown INSIDE the upload area (inline)
- * Uses URL.createObjectURL for faster preview rendering (no FileReader needed)
+ * Display product image previews - simplified
  */
 function displayProductPreviews() {
-    console.log('[displayProductPreviews] ========================================');
-    console.log('[displayProductPreviews] Called with', productFiles.length, 'files');
-    console.log('[displayProductPreviews] productFiles array:', productFiles.map(f => f.name));
-
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
     var placeholder = document.getElementById('productUploadPlaceholder');
     var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
-    console.log('[displayProductPreviews] DOM Elements Check:');
-    console.log('[displayProductPreviews] - Container (#productPreviews):', !!container);
-    console.log('[displayProductPreviews] - UploadArea (#productUploadArea):', !!uploadArea);
-    console.log('[displayProductPreviews] - Placeholder (#productUploadPlaceholder):', !!placeholder);
-    console.log('[displayProductPreviews] - PreviewsInline (#productPreviewsInline):', !!previewsInline);
-    console.log('[displayProductPreviews] - ProductCount (#productCount):', !!productCountSpan);
+    if (!container) return;
 
-    if (!container) {
-        console.error('[displayProductPreviews] ✗ CRITICAL: Container #productPreviews not found!');
-        console.error('[displayProductPreviews] Cannot display product previews without container element');
-        console.error('[displayProductPreviews] Check if the HTML element exists in the page');
-        alert('Error: Product preview container not found. Please refresh the page.');
-        return;
-    }
-
-    // Clear existing previews and revoke old object URLs
-    var oldImages = container.querySelectorAll('img[data-object-url="true"]');
-    for (var k = 0; k < oldImages.length; k++) {
-        try {
-            URL.revokeObjectURL(oldImages[k].src);
-        } catch (e) {
-            // Ignore errors when revoking
-        }
-    }
     container.innerHTML = '';
 
     // Show/hide elements based on whether there are files
     if (productFiles.length === 0) {
-        console.log('[displayProductPreviews] No files, showing placeholder');
         if (placeholder) placeholder.style.display = 'flex';
         if (previewsInline) previewsInline.style.display = 'none';
         if (uploadArea) uploadArea.classList.remove('has-images');
@@ -796,131 +573,36 @@ function displayProductPreviews() {
         return;
     }
 
-    // Special logging for single file case (the reported bug)
-    if (productFiles.length === 1) {
-        console.warn('[displayProductPreviews] ⚠️ SINGLE FILE CASE - This is the reported bug scenario');
-        console.warn('[displayProductPreviews] File:', productFiles[0].name, 'Size:', productFiles[0].size, 'Type:', productFiles[0].type);
-    }
-
     // Hide placeholder, show inline previews
-    console.log('[displayProductPreviews] Hiding placeholder, showing previews...');
-    if (placeholder) {
-        placeholder.style.display = 'none';
-        console.log('[displayProductPreviews] ✓ Placeholder hidden');
-    } else {
-        console.error('[displayProductPreviews] ✗ Placeholder element not found!');
-    }
-
-    if (previewsInline) {
-        previewsInline.style.display = 'flex';
-        console.log('[displayProductPreviews] ✓ PreviewsInline set to display: flex');
-        console.log('[displayProductPreviews] PreviewsInline computed display:', window.getComputedStyle(previewsInline).display);
-    } else {
-        console.error('[displayProductPreviews] ✗ PreviewsInline element not found!');
-    }
-
-    if (uploadArea) {
-        uploadArea.classList.add('has-images');
-        console.log('[displayProductPreviews] ✓ UploadArea class "has-images" added');
-    } else {
-        console.error('[displayProductPreviews] ✗ UploadArea element not found!');
-    }
+    if (placeholder) placeholder.style.display = 'none';
+    if (previewsInline) previewsInline.style.display = 'flex';
+    if (uploadArea) uploadArea.classList.add('has-images');
 
     // Update count badge
     if (productCountSpan) {
         productCountSpan.style.display = 'inline-block';
         productCountSpan.textContent = productFiles.length;
-        console.log('[displayProductPreviews] ✓ Count badge updated to:', productFiles.length);
     }
-    console.log('[displayProductPreviews] Showing', productFiles.length, 'preview(s) inline');
 
-    // Process each file using URL.createObjectURL (faster than FileReader for previews)
-    console.log('[displayProductPreviews] Starting loop to create', productFiles.length, 'preview item(s)');
+    // Process each file using FileReader
     for (var i = 0; i < productFiles.length; i++) {
         (function(index, file) {
-            console.log('[displayProductPreviews] ----------------------------------------');
-            console.log('[displayProductPreviews] Processing file', index + 1, 'of', productFiles.length);
-            console.log('[displayProductPreviews] File name:', file.name);
-            console.log('[displayProductPreviews] File size:', Math.round(file.size / 1024), 'KB');
-            console.log('[displayProductPreviews] File type:', file.type);
-
             var div = document.createElement('div');
             div.className = 'product-preview-item';
             div.setAttribute('data-index', index);
-            console.log('[displayProductPreviews] ✓ Created preview div for file', index + 1);
 
-            // Create image element using object URL (much faster than FileReader)
             var img = document.createElement('img');
             img.alt = 'Product ' + (index + 1);
-            img.setAttribute('data-object-url', 'true');
 
-            // CRITICAL: Set up event handlers BEFORE setting src (prevents race condition on mobile)
-            img.onload = function() {
-                console.log('[displayProductPreviews] ✓ Image', index + 1, 'rendered successfully');
-                console.log('[displayProductPreviews] Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
+            // Use FileReader to display preview
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                img.src = e.target.result;
             };
-
-            // Capture file reference for error handler
-            var fileRef = file;
-
-            img.onerror = function(errorEvent) {
-                console.error('[displayProductPreviews] ✗ Failed to render image', index + 1);
-                console.error('[displayProductPreviews] Error event:', errorEvent);
-                console.error('[displayProductPreviews] Image src:', this.src);
-                console.error('[displayProductPreviews] Image src type:', this.src.startsWith('blob:') ? 'Object URL' : 'Data URL');
-
-                // Try fallback to FileReader if object URL failed
-                if (this.src.startsWith('blob:')) {
-                    console.log('[displayProductPreviews] Object URL failed for file', index + 1, ', trying FileReader fallback...');
-                    var reader = new FileReader();
-                    var imgRef = this; // Capture reference
-
-                    reader.onload = function(evt) {
-                        console.log('[displayProductPreviews] FileReader loaded for file', index + 1, ', data URL length:', evt.target.result.length);
-                        imgRef.src = evt.target.result;
-                        imgRef.setAttribute('data-object-url', 'false');
-                    };
-
-                    reader.onerror = function(err) {
-                        console.error('[displayProductPreviews] FileReader also failed for file', index + 1, ':', err);
-                        alert('Failed to read product image ' + (index + 1) + '. Please try a different image.');
-                    };
-
-                    // Use the captured file reference
-                    console.log('[displayProductPreviews] Reading file with FileReader:', fileRef.name);
-                    reader.readAsDataURL(fileRef);
-                } else {
-                    alert('Failed to display product image ' + (index + 1) + '. Please try again.');
-                }
+            reader.onerror = function() {
+                console.error('Failed to read image:', file.name);
             };
-
-            // Create object URL for preview (set src AFTER handlers are attached)
-            try {
-                console.log('[displayProductPreviews] Attempting to create object URL for file', index + 1, ':', file.name);
-                console.log('[displayProductPreviews] File object valid:', file instanceof File);
-                console.log('[displayProductPreviews] File size:', file.size, 'bytes');
-
-                var objectUrl = URL.createObjectURL(file);
-                console.log('[displayProductPreviews] ✓ Created object URL for file', index + 1, ':', objectUrl.substring(0, 50) + '...');
-
-                // Set src AFTER handlers are attached (critical for mobile)
-                img.src = objectUrl;
-                console.log('[displayProductPreviews] Object URL assigned to img.src for file', index + 1);
-            } catch (e) {
-                console.error('[displayProductPreviews] Failed to create object URL for file', index + 1, ':', e);
-                // Fallback: try FileReader immediately
-                var reader = new FileReader();
-                reader.onload = function(evt) {
-                    img.src = evt.target.result;
-                    img.setAttribute('data-object-url', 'false');
-                    console.log('[displayProductPreviews] FileReader fallback successful for file', index + 1);
-                };
-                reader.onerror = function() {
-                    console.error('[displayProductPreviews] FileReader also failed for file', index + 1);
-                    alert('Failed to read product image ' + (index + 1) + '. Please try a different image.');
-                };
-                reader.readAsDataURL(file);
-            }
+            reader.readAsDataURL(file);
 
             div.appendChild(img);
 
@@ -931,61 +613,31 @@ function displayProductPreviews() {
             removeBtn.innerHTML = '<i class="fas fa-times"></i>';
             removeBtn.setAttribute('data-index', index);
 
-            // Use closure to capture correct index
             removeBtn.onclick = function(evt) {
                 evt.preventDefault();
                 evt.stopPropagation();
-                console.log('[displayProductPreviews] Remove clicked for index', index);
                 removeProductImage(index);
             };
 
-            // Also add touch support
             removeBtn.ontouchend = function(evt) {
                 evt.preventDefault();
                 evt.stopPropagation();
-                console.log('[displayProductPreviews] Remove touched for index', index);
                 removeProductImage(index);
             };
 
             div.appendChild(removeBtn);
-            console.log('[displayProductPreviews] ✓ Remove button added to preview div');
-
             container.appendChild(div);
-            console.log('[displayProductPreviews] ✓ Preview div appended to container');
-            console.log('[displayProductPreviews] Container now has', container.children.length, 'child element(s)');
-
-            // Special check for single file case
-            if (productFiles.length === 1) {
-                console.warn('[displayProductPreviews] ⚠️ SINGLE FILE: Preview item created and appended');
-                console.warn('[displayProductPreviews] Container innerHTML length:', container.innerHTML.length);
-                console.warn('[displayProductPreviews] Container display:', window.getComputedStyle(container).display);
-                console.warn('[displayProductPreviews] Container visibility:', window.getComputedStyle(container).visibility);
-                console.warn('[displayProductPreviews] Container parent (previewsInline) display:', window.getComputedStyle(container.parentElement).display);
-            }
-
-            console.log('[displayProductPreviews] ✓ Preview added for file', index + 1);
         })(i, productFiles[i]);
     }
-
-    console.log('[displayProductPreviews] ========================================');
-    console.log('[displayProductPreviews] ✓ COMPLETE: All', productFiles.length, 'preview(s) processed');
-    console.log('[displayProductPreviews] Final container children count:', container.children.length);
 }
 
 /**
- * Remove product image
+ * Remove product image - simplified
  */
 function removeProductImage(index) {
-    console.log('[removeProductImage] Removing product at index:', index);
-    console.log('[removeProductImage] Before removal, productFiles:', productFiles.length);
-
     if (index >= 0 && index < productFiles.length) {
         productFiles.splice(index, 1);
-        console.log('[removeProductImage] After removal, productFiles:', productFiles.length);
-    } else {
-        console.error('[removeProductImage] Invalid index:', index);
     }
-
     displayProductPreviews();
 }
 
