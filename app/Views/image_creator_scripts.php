@@ -1605,3 +1605,254 @@ function resetForm() {
     // Scroll to top of form
     document.getElementById('generationForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+/**
+ * Refresh page - Clear all form data, uploaded files, and state
+ * This provides a complete reset without reloading the page
+ */
+function refreshPage() {
+    console.log('[refreshPage] Starting complete page refresh');
+
+    // Clear all state variables
+    templateFile = null;
+    productFiles = [];
+    baseImageFiles = [];
+    primaryImageIndex = 0;
+
+    // Clear all form inputs
+    const promptInput = document.getElementById('promptInput');
+    if (promptInput) {
+        promptInput.value = '';
+    }
+
+    // Reset aspect ratio to default for flyers (2:3 portrait)
+    const aspectRatioSelect = document.getElementById('aspectRatioSelect');
+    if (aspectRatioSelect) {
+        aspectRatioSelect.value = '2:3';
+    }
+
+    // Clear all file inputs
+    const templateInput = document.getElementById('templateInput');
+    if (templateInput) {
+        templateInput.value = '';
+    }
+
+    const productImagesInput = document.getElementById('productImagesInput');
+    if (productImagesInput) {
+        productImagesInput.value = '';
+    }
+
+    const baseImageInput = document.getElementById('baseImageInput');
+    if (baseImageInput) {
+        baseImageInput.value = '';
+    }
+
+    // Reset template upload area
+    const templateUploadLabel = document.getElementById('templateUploadLabel');
+    if (templateUploadLabel) {
+        templateUploadLabel.style.display = 'flex';
+    }
+
+    const templatePreview = document.getElementById('templatePreview');
+    if (templatePreview) {
+        templatePreview.style.display = 'none';
+        const templatePreviewImg = document.getElementById('templatePreviewImg');
+        if (templatePreviewImg) {
+            // Revoke object URL if it exists
+            if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
+                try {
+                    URL.revokeObjectURL(templatePreviewImg.src);
+                } catch (e) {
+                    console.log('[refreshPage] Error revoking template URL:', e);
+                }
+            }
+            templatePreviewImg.src = '';
+        }
+    }
+
+    // Reset product images area
+    const productPreviews = document.getElementById('productPreviews');
+    if (productPreviews) {
+        // Revoke all object URLs before clearing
+        const productImages = productPreviews.querySelectorAll('img[data-object-url="true"]');
+        for (let i = 0; i < productImages.length; i++) {
+            try {
+                URL.revokeObjectURL(productImages[i].src);
+            } catch (e) {
+                console.log('[refreshPage] Error revoking product URL:', e);
+            }
+        }
+        productPreviews.innerHTML = '';
+    }
+
+    const productUploadPlaceholder = document.getElementById('productUploadPlaceholder');
+    if (productUploadPlaceholder) {
+        productUploadPlaceholder.style.display = 'flex';
+    }
+
+    const productPreviewsInline = document.getElementById('productPreviewsInline');
+    if (productPreviewsInline) {
+        productPreviewsInline.style.display = 'none';
+    }
+
+    const productCount = document.getElementById('productCount');
+    if (productCount) {
+        productCount.style.display = 'none';
+        productCount.textContent = '0';
+    }
+
+    // Reset base image previews (for edit mode)
+    const baseImagePreviews = document.getElementById('baseImagePreviews');
+    if (baseImagePreviews) {
+        // Revoke all object URLs before clearing
+        const baseImages = baseImagePreviews.querySelectorAll('img[data-object-url="true"]');
+        for (let i = 0; i < baseImages.length; i++) {
+            try {
+                URL.revokeObjectURL(baseImages[i].src);
+            } catch (e) {
+                console.log('[refreshPage] Error revoking base image URL:', e);
+            }
+        }
+        baseImagePreviews.innerHTML = '';
+    }
+
+    const baseImageUploadArea = document.getElementById('baseImageUploadArea');
+    if (baseImageUploadArea) {
+        const uploadPlaceholder = baseImageUploadArea.querySelector('.upload-placeholder');
+        if (uploadPlaceholder) {
+            uploadPlaceholder.style.display = 'flex';
+        }
+    }
+
+    // Hide and clear result section
+    const resultSection = document.getElementById('resultSection');
+    if (resultSection) {
+        resultSection.style.display = 'none';
+    }
+
+    const generatedImage = document.getElementById('generatedImage');
+    if (generatedImage) {
+        // Revoke object URL if it exists
+        if (generatedImage.src && generatedImage.src.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(generatedImage.src);
+            } catch (e) {
+                console.log('[refreshPage] Error revoking generated image URL:', e);
+            }
+        }
+        generatedImage.src = '';
+    }
+
+    // Hide loading container
+    const loadingContainer = document.getElementById('loadingContainer');
+    if (loadingContainer) {
+        loadingContainer.style.display = 'none';
+    }
+
+    // Clear localStorage related to image creator
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log('[refreshPage] Removed localStorage key:', key);
+        });
+    } catch (e) {
+        console.log('[refreshPage] Error clearing localStorage:', e);
+    }
+
+    // Clear sessionStorage related to image creator
+    try {
+        const sessionKeysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && (key.startsWith('imageCreator') || key.startsWith('image_creator') || key.startsWith('flyer') || key.startsWith('logo'))) {
+                sessionKeysToRemove.push(key);
+            }
+        }
+        sessionKeysToRemove.forEach(key => {
+            sessionStorage.removeItem(key);
+            console.log('[refreshPage] Removed sessionStorage key:', key);
+        });
+    } catch (e) {
+        console.log('[refreshPage] Error clearing sessionStorage:', e);
+    }
+
+    // Show success feedback with animation
+    showRefreshFeedback();
+
+    // Scroll to top of page smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    console.log('[refreshPage] Page refresh complete');
+}
+
+/**
+ * Show visual feedback when refresh is complete
+ */
+function showRefreshFeedback() {
+    // Create feedback element
+    const feedback = document.createElement('div');
+    feedback.className = 'refresh-feedback';
+    feedback.innerHTML = '<i class="fas fa-check-circle me-2"></i>Page refreshed successfully!';
+    feedback.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        z-index: 9999;
+        font-weight: 600;
+        animation: slideInRight 0.3s ease-out;
+    `;
+
+    // Add animation keyframes if not already added
+    if (!document.getElementById('refreshFeedbackStyles')) {
+        const style = document.createElement('style');
+        style.id = 'refreshFeedbackStyles';
+        style.textContent = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes slideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Add to page
+    document.body.appendChild(feedback);
+
+    // Remove after 2.5 seconds with animation
+    setTimeout(() => {
+        feedback.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+            if (feedback.parentNode) {
+                feedback.parentNode.removeChild(feedback);
+            }
+        }, 300);
+    }, 2500);
+}
