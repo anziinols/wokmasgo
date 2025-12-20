@@ -20,18 +20,37 @@ function isMobileDevice() {
  * More lenient check for mobile browsers that may report different MIME types
  */
 function isValidImageFile(file) {
-    if (!file) return false;
+    if (!file) {
+        console.log('[isValidImageFile] No file provided');
+        return false;
+    }
+
+    var fileType = file.type ? file.type.toLowerCase() : '';
+    var fileName = file.name ? file.name.toLowerCase() : '';
+
+    console.log('[isValidImageFile] Validating file:', fileName);
+    console.log('[isValidImageFile] MIME type:', fileType || '(empty)');
 
     // Check MIME type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif'];
-    if (validTypes.includes(file.type.toLowerCase())) {
+    var validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif'];
+    if (fileType && validTypes.includes(fileType)) {
+        console.log('[isValidImageFile] ✓ Valid MIME type:', fileType);
         return true;
     }
 
     // Fallback: check file extension for mobile browsers that may not report correct MIME type
-    const fileName = file.name.toLowerCase();
-    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.heic', '.heif'];
-    return validExtensions.some(ext => fileName.endsWith(ext));
+    var validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.heic', '.heif'];
+    var hasValidExtension = validExtensions.some(function(ext) {
+        return fileName.endsWith(ext);
+    });
+
+    if (hasValidExtension) {
+        console.log('[isValidImageFile] ✓ Valid file extension (MIME type was:', fileType || 'empty', ')');
+        return true;
+    }
+
+    console.log('[isValidImageFile] ✗ Invalid file - MIME type:', fileType, 'Extension:', fileName.substring(fileName.lastIndexOf('.')));
+    return false;
 }
 
 /**
@@ -124,20 +143,47 @@ document.addEventListener('DOMContentLoaded', function() {
     const templateInput = document.getElementById('templateInput');
     const templateUploadArea = document.getElementById('templateUploadArea');
 
+    console.log('[Template Upload] Initializing template upload handlers');
+    console.log('[Template Upload] templateInput found:', !!templateInput);
+    console.log('[Template Upload] templateUploadArea found:', !!templateUploadArea);
+
     if (templateInput) {
         templateInput.addEventListener('change', function(e) {
+            console.log('[templateInput] Change event triggered');
+            console.log('[templateInput] Files selected:', e.target.files.length);
+
             const file = e.target.files[0];
-            if (file && isValidImageFile(file)) {
+
+            if (!file) {
+                console.log('[templateInput] No file selected');
+                return;
+            }
+
+            console.log('[templateInput] File details:');
+            console.log('[templateInput] - Name:', file.name);
+            console.log('[templateInput] - Size:', Math.round(file.size / 1024), 'KB');
+            console.log('[templateInput] - Type:', file.type);
+            console.log('[templateInput] - Last modified:', new Date(file.lastModified).toISOString());
+
+            var isValid = isValidImageFile(file);
+            console.log('[templateInput] File validation result:', isValid);
+
+            if (file && isValid) {
                 if (file.size > 5 * 1024 * 1024) {
+                    console.warn('[templateInput] File too large:', Math.round(file.size / 1024), 'KB');
                     alert('File size must be less than 5MB');
                     return;
                 }
+                console.log('[templateInput] File accepted, setting templateFile and calling displayTemplatePreview');
                 templateFile = file;
                 displayTemplatePreview(file);
             } else if (file) {
+                console.error('[templateInput] Invalid file type:', file.type, 'for file:', file.name);
                 alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
             }
         });
+    } else {
+        console.error('[Template Upload] templateInput element not found!');
     }
 
     // Drag and drop for template
@@ -155,18 +201,41 @@ document.addEventListener('DOMContentLoaded', function() {
         templateUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
+
+            console.log('[templateUploadArea] Drop event triggered');
+            console.log('[templateUploadArea] Files dropped:', e.dataTransfer.files.length);
+
             const file = e.dataTransfer.files[0];
-            if (file && isValidImageFile(file)) {
+
+            if (!file) {
+                console.log('[templateUploadArea] No file in drop event');
+                return;
+            }
+
+            console.log('[templateUploadArea] File details:');
+            console.log('[templateUploadArea] - Name:', file.name);
+            console.log('[templateUploadArea] - Size:', Math.round(file.size / 1024), 'KB');
+            console.log('[templateUploadArea] - Type:', file.type);
+
+            var isValid = isValidImageFile(file);
+            console.log('[templateUploadArea] File validation result:', isValid);
+
+            if (file && isValid) {
                 if (file.size > 5 * 1024 * 1024) {
+                    console.warn('[templateUploadArea] File too large:', Math.round(file.size / 1024), 'KB');
                     alert('File size must be less than 5MB');
                     return;
                 }
+                console.log('[templateUploadArea] File accepted, setting templateFile and calling displayTemplatePreview');
                 templateFile = file;
                 displayTemplatePreview(file);
             } else if (file) {
+                console.error('[templateUploadArea] Invalid file type:', file.type, 'for file:', file.name);
                 alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
             }
         });
+    } else {
+        console.error('[Template Upload] templateUploadArea element not found!');
     }
 
     // Product images upload
@@ -340,53 +409,107 @@ document.addEventListener('DOMContentLoaded', function() {
  * Uses URL.createObjectURL for faster preview rendering
  */
 function displayTemplatePreview(file) {
-    console.log('[displayTemplatePreview] Processing file:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+    console.log('[displayTemplatePreview] ========================================');
+    console.log('[displayTemplatePreview] Processing file:', file.name);
+    console.log('[displayTemplatePreview] File size:', Math.round(file.size / 1024), 'KB');
+    console.log('[displayTemplatePreview] File type:', file.type);
+    console.log('[displayTemplatePreview] Is mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
 
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
 
-    if (uploadLabel) uploadLabel.style.display = 'none';
-    if (templatePreview) templatePreview.style.display = 'block';
+    console.log('[displayTemplatePreview] DOM elements found:');
+    console.log('[displayTemplatePreview] - uploadLabel:', !!uploadLabel);
+    console.log('[displayTemplatePreview] - templatePreview:', !!templatePreview);
+    console.log('[displayTemplatePreview] - templatePreviewImg:', !!templatePreviewImg);
 
-    if (templatePreviewImg) {
-        // Revoke old object URL if exists
-        if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
-            try {
-                URL.revokeObjectURL(templatePreviewImg.src);
-            } catch (e) {
-                // Ignore errors
-            }
-        }
+    if (!templatePreviewImg) {
+        console.error('[displayTemplatePreview] CRITICAL: templatePreviewImg element not found!');
+        alert('Error: Preview element not found. Please refresh the page.');
+        return;
+    }
 
-        // Use object URL for preview (faster than FileReader)
+    // Hide upload label, show preview container
+    if (uploadLabel) {
+        uploadLabel.style.display = 'none';
+        console.log('[displayTemplatePreview] Upload label hidden');
+    }
+    if (templatePreview) {
+        templatePreview.style.display = 'block';
+        console.log('[displayTemplatePreview] Preview container shown');
+    }
+
+    // Revoke old object URL if exists
+    if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
         try {
-            var objectUrl = URL.createObjectURL(file);
-            templatePreviewImg.src = objectUrl;
-            console.log('[displayTemplatePreview] Created object URL for preview');
+            URL.revokeObjectURL(templatePreviewImg.src);
+            console.log('[displayTemplatePreview] Revoked old object URL');
         } catch (e) {
-            console.error('[displayTemplatePreview] Failed to create object URL:', e);
-            // Fallback to FileReader
-            var reader = new FileReader();
-            reader.onload = function(evt) {
-                templatePreviewImg.src = evt.target.result;
-                console.log('[displayTemplatePreview] Fallback FileReader successful');
-            };
-            reader.onerror = function(err) {
-                console.error('[displayTemplatePreview] FileReader error:', err);
-                alert('Failed to read the image file. Please try again.');
-            };
-            reader.readAsDataURL(file);
-            return;
+            console.warn('[displayTemplatePreview] Failed to revoke old URL:', e);
         }
+    }
 
-        templatePreviewImg.onload = function() {
-            console.log('[displayTemplatePreview] Template image loaded successfully');
+    // Clear any existing src to prevent cached errors
+    templatePreviewImg.src = '';
+
+    // Set up event handlers BEFORE setting src (critical for mobile)
+    templatePreviewImg.onload = function() {
+        console.log('[displayTemplatePreview] ✓ Template image loaded successfully');
+        console.log('[displayTemplatePreview] Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
+    };
+
+    templatePreviewImg.onerror = function(errorEvent) {
+        console.error('[displayTemplatePreview] ✗ Failed to load template image');
+        console.error('[displayTemplatePreview] Error event:', errorEvent);
+        console.error('[displayTemplatePreview] Image src:', this.src);
+        console.error('[displayTemplatePreview] Image src type:', this.src.startsWith('blob:') ? 'Object URL' : 'Data URL');
+
+        // Try fallback to FileReader if object URL failed
+        if (this.src.startsWith('blob:')) {
+            console.log('[displayTemplatePreview] Object URL failed, trying FileReader fallback...');
+            var reader = new FileReader();
+            var img = this; // Capture reference
+
+            reader.onload = function(evt) {
+                console.log('[displayTemplatePreview] FileReader loaded, data URL length:', evt.target.result.length);
+                img.src = evt.target.result;
+            };
+
+            reader.onerror = function(err) {
+                console.error('[displayTemplatePreview] FileReader also failed:', err);
+                alert('Failed to read the image file. Please try a different image or refresh the page.');
+            };
+
+            reader.readAsDataURL(file);
+        } else {
+            alert('Failed to display image preview. Please try again or use a different image.');
+        }
+    };
+
+    // Use object URL for preview (faster than FileReader)
+    try {
+        var objectUrl = URL.createObjectURL(file);
+        console.log('[displayTemplatePreview] Created object URL:', objectUrl.substring(0, 50) + '...');
+
+        // Set src AFTER handlers are attached
+        templatePreviewImg.src = objectUrl;
+        console.log('[displayTemplatePreview] Object URL assigned to img.src');
+    } catch (e) {
+        console.error('[displayTemplatePreview] Failed to create object URL:', e);
+        console.log('[displayTemplatePreview] Using FileReader fallback immediately');
+
+        // Fallback to FileReader
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+            console.log('[displayTemplatePreview] FileReader successful, data URL length:', evt.target.result.length);
+            templatePreviewImg.src = evt.target.result;
         };
-        templatePreviewImg.onerror = function() {
-            console.error('[displayTemplatePreview] Failed to load template image');
-            alert('Failed to display image preview. Please try again.');
+        reader.onerror = function(err) {
+            console.error('[displayTemplatePreview] FileReader error:', err);
+            alert('Failed to read the image file. Please try again.');
         };
+        reader.readAsDataURL(file);
     }
 }
 
