@@ -170,23 +170,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Product images upload
-    const productImagesInput = document.getElementById('productImagesInput');
-    const productUploadArea = document.getElementById('productUploadArea');
+    var productImagesInput = document.getElementById('productImagesInput');
+    var productUploadArea = document.getElementById('productUploadArea');
+
+    console.log('[DOMContentLoaded] productImagesInput found:', !!productImagesInput);
+    console.log('[DOMContentLoaded] productUploadArea found:', !!productUploadArea);
 
     if (productImagesInput) {
         productImagesInput.addEventListener('change', function(e) {
-            const files = Array.from(e.target.files);
-            files.forEach(file => {
+            console.log('[productImagesInput] Change event triggered');
+            console.log('[productImagesInput] Files selected:', e.target.files.length);
+
+            var files = Array.from(e.target.files);
+            var addedCount = 0;
+
+            files.forEach(function(file) {
+                console.log('[productImagesInput] Processing file:', file.name, 'Type:', file.type, 'Size:', file.size);
                 if (isValidImageFile(file)) {
                     if (file.size > 5 * 1024 * 1024) {
                         alert('File size must be less than 5MB: ' + file.name);
                         return;
                     }
                     productFiles.push(file);
+                    addedCount++;
+                    console.log('[productImagesInput] File added to productFiles');
                 } else {
+                    console.log('[productImagesInput] Invalid file type:', file.type);
                     alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
                 }
             });
+
+            console.log('[productImagesInput] Total productFiles now:', productFiles.length);
+            console.log('[productImagesInput] Calling displayProductPreviews()');
             displayProductPreviews();
         });
     }
@@ -206,18 +221,26 @@ document.addEventListener('DOMContentLoaded', function() {
         productUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
-            const files = Array.from(e.dataTransfer.files);
-            files.forEach(file => {
+            console.log('[productUploadArea] Drop event triggered');
+
+            var files = Array.from(e.dataTransfer.files);
+            console.log('[productUploadArea] Files dropped:', files.length);
+
+            files.forEach(function(file) {
+                console.log('[productUploadArea] Processing file:', file.name);
                 if (isValidImageFile(file)) {
                     if (file.size > 5 * 1024 * 1024) {
                         alert('File size must be less than 5MB: ' + file.name);
                         return;
                     }
                     productFiles.push(file);
+                    console.log('[productUploadArea] File added to productFiles');
                 } else {
                     alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
                 }
             });
+
+            console.log('[productUploadArea] Total productFiles now:', productFiles.length);
             displayProductPreviews();
         });
     }
@@ -462,69 +485,119 @@ function removeBaseImage(index) {
  * Previews are shown in a separate container below the upload zone
  */
 function displayProductPreviews() {
-    const container = document.getElementById('productPreviews');
-    const previewsContainer = document.getElementById('productPreviewsContainer');
-    const productCountSpan = document.getElementById('productCount');
+    console.log('[displayProductPreviews] Called with', productFiles.length, 'files');
 
-    if (!container) return;
+    var container = document.getElementById('productPreviews');
+    var previewsContainer = document.getElementById('productPreviewsContainer');
+    var productCountSpan = document.getElementById('productCount');
 
+    console.log('[displayProductPreviews] Container found:', !!container);
+    console.log('[displayProductPreviews] PreviewsContainer found:', !!previewsContainer);
+    console.log('[displayProductPreviews] ProductCountSpan found:', !!productCountSpan);
+
+    if (!container) {
+        console.error('[displayProductPreviews] Container #productPreviews not found!');
+        return;
+    }
+
+    // Clear existing previews
     container.innerHTML = '';
 
     // Show/hide the preview container based on whether there are files
     if (productFiles.length === 0) {
+        console.log('[displayProductPreviews] No files, hiding container');
         if (previewsContainer) previewsContainer.style.display = 'none';
         return;
     }
 
     // Show the preview container and update count
-    if (previewsContainer) previewsContainer.style.display = 'block';
-    if (productCountSpan) productCountSpan.textContent = productFiles.length;
+    if (previewsContainer) {
+        previewsContainer.style.display = 'block';
+        console.log('[displayProductPreviews] Container displayed');
+    }
+    if (productCountSpan) {
+        productCountSpan.textContent = productFiles.length;
+    }
 
-    productFiles.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const div = document.createElement('div');
-            div.className = 'product-preview-item';
+    // Process each file
+    for (var i = 0; i < productFiles.length; i++) {
+        (function(index, file) {
+            console.log('[displayProductPreviews] Processing file', index + 1, ':', file.name);
 
-            // Create image element for better mobile compatibility
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.alt = 'Product ' + (index + 1);
-            img.onload = function() {
-                console.log('Product image ' + (index + 1) + ' loaded successfully');
+            var reader = new FileReader();
+
+            reader.onload = function(e) {
+                console.log('[displayProductPreviews] FileReader loaded for file', index + 1);
+
+                var div = document.createElement('div');
+                div.className = 'product-preview-item';
+                div.setAttribute('data-index', index);
+
+                // Create image element
+                var img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = 'Product ' + (index + 1);
+                img.onload = function() {
+                    console.log('[displayProductPreviews] Image', index + 1, 'rendered successfully');
+                };
+                img.onerror = function() {
+                    console.error('[displayProductPreviews] Failed to render image', index + 1);
+                };
+
+                div.appendChild(img);
+
+                // Add remove button
+                var removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-sm btn-danger remove-btn';
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.setAttribute('data-index', index);
+
+                // Use closure to capture correct index
+                removeBtn.onclick = function(evt) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    console.log('[displayProductPreviews] Remove clicked for index', index);
+                    removeProductImage(index);
+                };
+
+                // Also add touch support
+                removeBtn.ontouchend = function(evt) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    console.log('[displayProductPreviews] Remove touched for index', index);
+                    removeProductImage(index);
+                };
+
+                div.appendChild(removeBtn);
+                container.appendChild(div);
+
+                console.log('[displayProductPreviews] Preview added for file', index + 1);
             };
-            img.onerror = function() {
-                console.error('Failed to load product image ' + (index + 1));
+
+            reader.onerror = function(err) {
+                console.error('[displayProductPreviews] FileReader error for file', index + 1, ':', err);
             };
 
-            div.appendChild(img);
-
-            // Add remove button with proper event listener
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-sm btn-danger remove-btn';
-            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-            removeBtn.addEventListener('click', function(evt) {
-                evt.preventDefault();
-                evt.stopPropagation();
-                removeProductImage(index);
-            });
-            div.appendChild(removeBtn);
-
-            container.appendChild(div);
-        };
-        reader.onerror = function(e) {
-            console.error('FileReader error for product image:', e);
-        };
-        reader.readAsDataURL(file);
-    });
+            reader.readAsDataURL(file);
+        })(i, productFiles[i]);
+    }
 }
 
 /**
  * Remove product image
  */
 function removeProductImage(index) {
-    productFiles.splice(index, 1);
+    console.log('[removeProductImage] Removing product at index:', index);
+    console.log('[removeProductImage] Before removal, productFiles:', productFiles.length);
+
+    if (index >= 0 && index < productFiles.length) {
+        productFiles.splice(index, 1);
+        console.log('[removeProductImage] After removal, productFiles:', productFiles.length);
+    } else {
+        console.error('[removeProductImage] Invalid index:', index);
+    }
+
     displayProductPreviews();
 }
 
