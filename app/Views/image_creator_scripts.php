@@ -274,6 +274,42 @@ document.addEventListener('DOMContentLoaded', function() {
             displayBaseImagePreviews();
         });
     }
+
+    // Add touch-friendly event handlers for mode cards (mobile compatibility)
+    var createModeCard = document.getElementById('createModeCard');
+    var editModeCard = document.getElementById('editModeCard');
+
+    if (createModeCard) {
+        createModeCard.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            selectFlyerMode('create');
+        });
+    }
+
+    if (editModeCard) {
+        editModeCard.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            selectFlyerMode('edit');
+        });
+    }
+
+    // Add touch-friendly event handlers for image type cards
+    var logoTypeCard = document.getElementById('logoTypeCard');
+    var flyerTypeCard = document.getElementById('flyerTypeCard');
+
+    if (logoTypeCard) {
+        logoTypeCard.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            selectImageType('logo');
+        });
+    }
+
+    if (flyerTypeCard) {
+        flyerTypeCard.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            selectImageType('flyer');
+        });
+    }
 });
 
 /**
@@ -511,7 +547,13 @@ async function generateImage() {
         return;
     }
 
-    // Validation for edit mode
+    // Validation for flyer type - must select a mode
+    if (selectedType === 'flyer' && !selectedMode) {
+        alert('Please select a flyer mode (Create New or Edit Existing).');
+        return;
+    }
+
+    // Validation for edit mode - must have at least one image
     if (selectedType === 'flyer' && selectedMode === 'edit') {
         if (baseImageFiles.length === 0) {
             alert('Please upload at least one image to edit.');
@@ -519,7 +561,18 @@ async function generateImage() {
         }
     }
 
-    console.log('[generateImage] Validation passed, selectedType:', selectedType, 'selectedMode:', selectedMode);
+    // Validation for create mode - should have at least template or product images
+    if (selectedType === 'flyer' && selectedMode === 'create') {
+        if (!templateFile && productFiles.length === 0) {
+            // Allow but warn the user
+            console.log('[generateImage] Create mode with no images - will generate from scratch');
+        }
+    }
+
+    console.log('[generateImage] Validation passed');
+    console.log('[generateImage] Type:', selectedType, 'Mode:', selectedMode);
+    console.log('[generateImage] Template:', templateFile ? templateFile.name : 'none');
+    console.log('[generateImage] Products:', productFiles.length);
 
     // Show loading
     document.getElementById('generateBtn').disabled = true;
@@ -848,7 +901,16 @@ async function callGeminiNanoBanana(prompt) {
             text: prompt
         });
 
+        // Count how many images are in contentParts
+        var imageCount = 0;
+        for (var k = 0; k < contentParts.length; k++) {
+            if (contentParts[k].type === 'image_url') {
+                imageCount++;
+            }
+        }
         console.log('[callGeminiNanoBanana] Content parts ready:', contentParts.length, 'parts');
+        console.log('[callGeminiNanoBanana] Images included:', imageCount);
+        console.log('[callGeminiNanoBanana] Text prompts:', contentParts.length - imageCount);
 
         // Prepare the API request body
         var requestBody = {
