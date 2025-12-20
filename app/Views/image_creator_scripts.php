@@ -167,9 +167,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[Template Upload] templateUploadArea found:', !!templateUploadArea);
 
     if (templateInput) {
+        console.log('[Template Upload] Attaching change event listener to templateInput');
         templateInput.addEventListener('change', function(e) {
+            console.log('[templateInput] ========================================');
             console.log('[templateInput] Change event triggered');
             console.log('[templateInput] Files selected:', e.target.files.length);
+            console.log('[templateInput] Current templateFile:', templateFile ? templateFile.name : 'null');
+            console.log('[templateInput] Current productFiles array length:', productFiles.length);
 
             const file = e.target.files[0];
 
@@ -290,9 +294,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[DOMContentLoaded] productUploadArea found:', !!productUploadArea);
 
     if (productImagesInput) {
+        console.log('[Product Upload] Attaching change event listener to productImagesInput');
         productImagesInput.addEventListener('change', function(e) {
+            console.log('[productImagesInput] ========================================');
             console.log('[productImagesInput] Change event triggered');
             console.log('[productImagesInput] Files selected:', e.target.files.length);
+            console.log('[productImagesInput] Current productFiles array length:', productFiles.length);
+            console.log('[productImagesInput] Current templateFile:', templateFile ? templateFile.name : 'null');
 
             var files = Array.from(e.target.files);
             var addedCount = 0;
@@ -739,7 +747,9 @@ function removeBaseImage(index) {
  * Uses URL.createObjectURL for faster preview rendering (no FileReader needed)
  */
 function displayProductPreviews() {
+    console.log('[displayProductPreviews] ========================================');
     console.log('[displayProductPreviews] Called with', productFiles.length, 'files');
+    console.log('[displayProductPreviews] productFiles array:', productFiles.map(f => f.name));
 
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
@@ -747,13 +757,18 @@ function displayProductPreviews() {
     var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
-    console.log('[displayProductPreviews] Container found:', !!container);
-    console.log('[displayProductPreviews] UploadArea found:', !!uploadArea);
-    console.log('[displayProductPreviews] Placeholder found:', !!placeholder);
-    console.log('[displayProductPreviews] PreviewsInline found:', !!previewsInline);
+    console.log('[displayProductPreviews] DOM Elements Check:');
+    console.log('[displayProductPreviews] - Container (#productPreviews):', !!container);
+    console.log('[displayProductPreviews] - UploadArea (#productUploadArea):', !!uploadArea);
+    console.log('[displayProductPreviews] - Placeholder (#productUploadPlaceholder):', !!placeholder);
+    console.log('[displayProductPreviews] - PreviewsInline (#productPreviewsInline):', !!previewsInline);
+    console.log('[displayProductPreviews] - ProductCount (#productCount):', !!productCountSpan);
 
     if (!container) {
-        console.error('[displayProductPreviews] Container #productPreviews not found!');
+        console.error('[displayProductPreviews] ✗ CRITICAL: Container #productPreviews not found!');
+        console.error('[displayProductPreviews] Cannot display product previews without container element');
+        console.error('[displayProductPreviews] Check if the HTML element exists in the page');
+        alert('Error: Product preview container not found. Please refresh the page.');
         return;
     }
 
