@@ -137,6 +137,25 @@ function selectFlyerMode(mode) {
 }
 
 /**
+ * Initialize page state from hidden inputs
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    // Read image type and mode from hidden inputs if they exist
+    const imageTypeInput = document.getElementById('imageType');
+    const imageModeInput = document.getElementById('imageMode');
+
+    if (imageTypeInput && imageTypeInput.value) {
+        selectedType = imageTypeInput.value;
+        console.log('[Init] Image type set to:', selectedType);
+    }
+
+    if (imageModeInput && imageModeInput.value) {
+        selectedMode = imageModeInput.value;
+        console.log('[Init] Image mode set to:', selectedMode);
+    }
+});
+
+/**
  * Handle template file upload
  */
 document.addEventListener('DOMContentLoaded', function() {

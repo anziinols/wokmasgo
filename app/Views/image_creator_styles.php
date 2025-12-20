@@ -27,7 +27,24 @@
     font-size: 1.5rem;
 }
 
+/* Button Styles */
+.btn-outline-maroon {
+    color: var(--maroon);
+    border-color: var(--maroon);
+    background-color: transparent;
+}
+
+.btn-outline-maroon:hover {
+    color: var(--white);
+    background-color: var(--maroon);
+    border-color: var(--maroon);
+}
+
 /* Image Type Cards */
+a .image-type-card {
+    display: block;
+}
+
 .image-type-card {
     border: 3px solid #e0e0e0;
     border-radius: 15px;

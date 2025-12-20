@@ -7,8 +7,7 @@ use CodeIgniter\HTTP\ResponseInterface;
 class ImageCreator extends BaseController
 {
     /**
-     * Display the Image Creator page
-     * Image generation is done via backend API call to OpenRouter
+     * Display the Image Creator main page (selection page)
      *
      * @return string
      */
@@ -24,6 +23,68 @@ class ImageCreator extends BaseController
         // Load the image creator content view
         $mainContent = view('image_creator_content', $viewData);
 
+        // Load additional CSS
+        $additionalCss = view('image_creator_styles', $viewData);
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Image Creator - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => ''
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Logo options page
+     *
+     * @return string
+     */
+    public function logo(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'base_url' => base_url()
+        ];
+
+        // Load the logo options view
+        $mainContent = view('image_creator_logo', $viewData);
+
+        // Load additional CSS
+        $additionalCss = view('image_creator_styles', $viewData);
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Logo Creator - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => ''
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Logo creation page
+     *
+     * @return string
+     */
+    public function logoCreate(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'csrf_token_name' => csrf_token(),
+            'csrf_hash' => csrf_hash(),
+            'base_url' => base_url()
+        ];
+
+        // Load the logo create view
+        $mainContent = view('image_creator_logo_create', $viewData);
+
         // Load additional CSS and JS
         $additionalCss = view('image_creator_styles', $viewData);
         $scriptContent = view('image_creator_scripts', $viewData);
@@ -33,7 +94,145 @@ class ImageCreator extends BaseController
 
         // Prepare data for the template
         $templateData = [
-            'page_title' => 'Image Creator - WOKMASGO',
+            'page_title' => 'Create Logo - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => $additionalJs
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Logo edit page
+     *
+     * @return string
+     */
+    public function logoEdit(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'csrf_token_name' => csrf_token(),
+            'csrf_hash' => csrf_hash(),
+            'base_url' => base_url()
+        ];
+
+        // Load the logo edit view
+        $mainContent = view('image_creator_logo_edit', $viewData);
+
+        // Load additional CSS and JS
+        $additionalCss = view('image_creator_styles', $viewData);
+        $scriptContent = view('image_creator_scripts', $viewData);
+
+        // Add cache busting comment to force reload
+        $additionalJs = '<script>// Version: ' . time() . "\n" . $scriptContent . '</script>';
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Edit Logo - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => $additionalJs
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Flyer options page
+     *
+     * @return string
+     */
+    public function flyer(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'base_url' => base_url()
+        ];
+
+        // Load the flyer options view
+        $mainContent = view('image_creator_flyer', $viewData);
+
+        // Load additional CSS
+        $additionalCss = view('image_creator_styles', $viewData);
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Advertisement Flyer Creator - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => ''
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Flyer creation page
+     *
+     * @return string
+     */
+    public function flyerCreate(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'csrf_token_name' => csrf_token(),
+            'csrf_hash' => csrf_hash(),
+            'base_url' => base_url()
+        ];
+
+        // Load the flyer create view
+        $mainContent = view('image_creator_flyer_create', $viewData);
+
+        // Load additional CSS and JS
+        $additionalCss = view('image_creator_styles', $viewData);
+        $scriptContent = view('image_creator_scripts', $viewData);
+
+        // Add cache busting comment to force reload
+        $additionalJs = '<script>// Version: ' . time() . "\n" . $scriptContent . '</script>';
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Create Flyer - WOKMASGO',
+            'main_content' => $mainContent,
+            'additional_css' => $additionalCss,
+            'additional_js' => $additionalJs
+        ];
+
+        // Return the complete page using the public template
+        return view('public_template', $templateData);
+    }
+
+    /**
+     * Display Flyer edit page
+     *
+     * @return string
+     */
+    public function flyerEdit(): string
+    {
+        // Prepare data for views
+        $viewData = [
+            'csrf_token_name' => csrf_token(),
+            'csrf_hash' => csrf_hash(),
+            'base_url' => base_url()
+        ];
+
+        // Load the flyer edit view
+        $mainContent = view('image_creator_flyer_edit', $viewData);
+
+        // Load additional CSS and JS
+        $additionalCss = view('image_creator_styles', $viewData);
+        $scriptContent = view('image_creator_scripts', $viewData);
+
+        // Add cache busting comment to force reload
+        $additionalJs = '<script>// Version: ' . time() . "\n" . $scriptContent . '</script>';
+
+        // Prepare data for the template
+        $templateData = [
+            'page_title' => 'Edit Flyer - WOKMASGO',
             'main_content' => $mainContent,
             'additional_css' => $additionalCss,
             'additional_js' => $additionalJs

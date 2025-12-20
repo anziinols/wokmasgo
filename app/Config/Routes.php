@@ -13,6 +13,12 @@ $routes->get('markdown-viewer', 'MarkdownViewer::index');
 
 // Image Creator routes (AI-powered image generation)
 $routes->get('image-creator', 'ImageCreator::index');
+$routes->get('image-creator/logo', 'ImageCreator::logo');
+$routes->get('image-creator/logo/create', 'ImageCreator::logoCreate');
+$routes->get('image-creator/logo/edit', 'ImageCreator::logoEdit');
+$routes->get('image-creator/flyer', 'ImageCreator::flyer');
+$routes->get('image-creator/flyer/create', 'ImageCreator::flyerCreate');
+$routes->get('image-creator/flyer/edit', 'ImageCreator::flyerEdit');
 $routes->post('image-creator/generate', 'ImageCreator::generate');
 
 // Future app routes (uncomment when ready to use)
