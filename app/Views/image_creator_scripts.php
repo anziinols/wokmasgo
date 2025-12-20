@@ -201,6 +201,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create Object URL for preview (no FileReader needed - instant!)
             const objectUrl = URL.createObjectURL(file);
+            console.log('[Template Upload] Created Object URL:', objectUrl);
+            console.log('[Template Upload] File name:', file.name);
             displayTemplatePreview(objectUrl, file.name);
         });
     }
@@ -276,12 +278,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create Object URLs for preview (no FileReader needed - instant!)
             var objectUrls = productFiles.map(function(file) {
+                var url = URL.createObjectURL(file);
+                console.log('[Product Upload] Created Object URL for', file.name, ':', url);
                 return {
-                    url: URL.createObjectURL(file),
+                    url: url,
                     name: file.name
                 };
             });
 
+            console.log('[Product Upload] Total Object URLs created:', objectUrls.length);
             displayProductPreviews(objectUrls);
         });
     }
@@ -324,12 +329,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create Object URLs for preview (no FileReader needed - instant!)
             var objectUrls = productFiles.map(function(file) {
+                var url = URL.createObjectURL(file);
+                console.log('[Product Drag-Drop] Created Object URL for', file.name, ':', url);
                 return {
-                    url: URL.createObjectURL(file),
+                    url: url,
                     name: file.name
                 };
             });
 
+            console.log('[Product Drag-Drop] Total Object URLs created:', objectUrls.length);
             displayProductPreviews(objectUrls);
         });
     }
@@ -428,26 +436,45 @@ document.addEventListener('DOMContentLoaded', function() {
  * Display template preview - receives Object URL
  */
 function displayTemplatePreview(objectUrl, fileName) {
+    console.log('[displayTemplatePreview] Called with objectUrl:', objectUrl, 'fileName:', fileName);
+
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
 
     if (!templatePreviewImg) {
+        console.error('[displayTemplatePreview] Preview element not found!');
         alert('Error: Preview element not found. Please refresh the page.');
         return;
     }
 
     if (!objectUrl) {
+        console.error('[displayTemplatePreview] No objectUrl provided!');
         alert('Invalid image data. Please try again.');
         return;
     }
+
+    console.log('[displayTemplatePreview] Elements found, setting up preview...');
 
     // Hide upload label, show preview container
     if (uploadLabel) uploadLabel.style.display = 'none';
     if (templatePreview) templatePreview.style.display = 'block';
 
     // Set image src to Object URL (instant, no FileReader needed!)
+    console.log('[displayTemplatePreview] Setting img.src to:', objectUrl);
     templatePreviewImg.src = objectUrl;
+
+    // Add load and error handlers for debugging
+    templatePreviewImg.onload = function() {
+        console.log('[displayTemplatePreview] Image loaded successfully!');
+    };
+
+    templatePreviewImg.onerror = function(e) {
+        console.error('[displayTemplatePreview] Image failed to load:', e);
+        console.error('[displayTemplatePreview] Failed URL:', objectUrl);
+    };
+
+    console.log('[displayTemplatePreview] Preview setup complete');
 }
 
 /**
@@ -609,18 +636,24 @@ function removeBaseImage(index) {
  * Display product image previews - receives Object URLs
  */
 function displayProductPreviews(objectUrls) {
+    console.log('[displayProductPreviews] Called with', objectUrls ? objectUrls.length : 0, 'URLs');
+
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
     var placeholder = document.getElementById('productUploadPlaceholder');
     var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
-    if (!container) return;
+    if (!container) {
+        console.error('[displayProductPreviews] Container not found!');
+        return;
+    }
 
     container.innerHTML = '';
 
     // Show/hide elements based on whether there are results
     if (!objectUrls || objectUrls.length === 0) {
+        console.log('[displayProductPreviews] No URLs, showing placeholder');
         if (placeholder) placeholder.style.display = 'flex';
         if (previewsInline) previewsInline.style.display = 'none';
         if (uploadArea) uploadArea.classList.remove('has-images');
@@ -630,6 +663,8 @@ function displayProductPreviews(objectUrls) {
         }
         return;
     }
+
+    console.log('[displayProductPreviews] Displaying', objectUrls.length, 'previews');
 
     // Hide placeholder, show inline previews
     if (placeholder) placeholder.style.display = 'none';
@@ -645,6 +680,8 @@ function displayProductPreviews(objectUrls) {
     // Create preview for each Object URL
     for (var i = 0; i < objectUrls.length; i++) {
         (function(index, result) {
+            console.log('[displayProductPreviews] Creating preview', index + 1, 'with URL:', result.url);
+
             var div = document.createElement('div');
             div.className = 'product-preview-item';
             div.setAttribute('data-index', index);
@@ -653,7 +690,18 @@ function displayProductPreviews(objectUrls) {
             img.alt = 'Product ' + (index + 1);
 
             // Set image src to Object URL (instant, no FileReader needed!)
+            console.log('[displayProductPreviews] Setting img.src for product', index + 1);
             img.src = result.url;
+
+            // Add load and error handlers for debugging
+            img.onload = function() {
+                console.log('[displayProductPreviews] Product image', index + 1, 'loaded successfully!');
+            };
+
+            img.onerror = function(e) {
+                console.error('[displayProductPreviews] Product image', index + 1, 'failed to load:', e);
+                console.error('[displayProductPreviews] Failed URL:', result.url);
+            };
 
             div.appendChild(img);
 
