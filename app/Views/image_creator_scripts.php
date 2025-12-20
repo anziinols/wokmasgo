@@ -854,31 +854,73 @@ function displayProductPreviews() {
             img.alt = 'Product ' + (index + 1);
             img.setAttribute('data-object-url', 'true');
 
-            // Create object URL for preview
+            // CRITICAL: Set up event handlers BEFORE setting src (prevents race condition on mobile)
+            img.onload = function() {
+                console.log('[displayProductPreviews] ✓ Image', index + 1, 'rendered successfully');
+                console.log('[displayProductPreviews] Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
+            };
+
+            // Capture file reference for error handler
+            var fileRef = file;
+
+            img.onerror = function(errorEvent) {
+                console.error('[displayProductPreviews] ✗ Failed to render image', index + 1);
+                console.error('[displayProductPreviews] Error event:', errorEvent);
+                console.error('[displayProductPreviews] Image src:', this.src);
+                console.error('[displayProductPreviews] Image src type:', this.src.startsWith('blob:') ? 'Object URL' : 'Data URL');
+
+                // Try fallback to FileReader if object URL failed
+                if (this.src.startsWith('blob:')) {
+                    console.log('[displayProductPreviews] Object URL failed for file', index + 1, ', trying FileReader fallback...');
+                    var reader = new FileReader();
+                    var imgRef = this; // Capture reference
+
+                    reader.onload = function(evt) {
+                        console.log('[displayProductPreviews] FileReader loaded for file', index + 1, ', data URL length:', evt.target.result.length);
+                        imgRef.src = evt.target.result;
+                        imgRef.setAttribute('data-object-url', 'false');
+                    };
+
+                    reader.onerror = function(err) {
+                        console.error('[displayProductPreviews] FileReader also failed for file', index + 1, ':', err);
+                        alert('Failed to read product image ' + (index + 1) + '. Please try a different image.');
+                    };
+
+                    // Use the captured file reference
+                    console.log('[displayProductPreviews] Reading file with FileReader:', fileRef.name);
+                    reader.readAsDataURL(fileRef);
+                } else {
+                    alert('Failed to display product image ' + (index + 1) + '. Please try again.');
+                }
+            };
+
+            // Create object URL for preview (set src AFTER handlers are attached)
             try {
+                console.log('[displayProductPreviews] Attempting to create object URL for file', index + 1, ':', file.name);
+                console.log('[displayProductPreviews] File object valid:', file instanceof File);
+                console.log('[displayProductPreviews] File size:', file.size, 'bytes');
+
                 var objectUrl = URL.createObjectURL(file);
+                console.log('[displayProductPreviews] ✓ Created object URL for file', index + 1, ':', objectUrl.substring(0, 50) + '...');
+
+                // Set src AFTER handlers are attached (critical for mobile)
                 img.src = objectUrl;
-                console.log('[displayProductPreviews] Created object URL for file', index + 1);
+                console.log('[displayProductPreviews] Object URL assigned to img.src for file', index + 1);
             } catch (e) {
                 console.error('[displayProductPreviews] Failed to create object URL for file', index + 1, ':', e);
-                // Fallback: try FileReader
+                // Fallback: try FileReader immediately
                 var reader = new FileReader();
                 reader.onload = function(evt) {
                     img.src = evt.target.result;
                     img.setAttribute('data-object-url', 'false');
+                    console.log('[displayProductPreviews] FileReader fallback successful for file', index + 1);
                 };
                 reader.onerror = function() {
                     console.error('[displayProductPreviews] FileReader also failed for file', index + 1);
+                    alert('Failed to read product image ' + (index + 1) + '. Please try a different image.');
                 };
                 reader.readAsDataURL(file);
             }
-
-            img.onload = function() {
-                console.log('[displayProductPreviews] Image', index + 1, 'rendered successfully');
-            };
-            img.onerror = function() {
-                console.error('[displayProductPreviews] Failed to render image', index + 1);
-            };
 
             div.appendChild(img);
 
