@@ -191,14 +191,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (file.size > 5 * 1024 * 1024) {
                     console.warn('[templateInput] File too large:', Math.round(file.size / 1024), 'KB');
                     alert('File size must be less than 5MB');
+                    e.target.value = ''; // Clear the input
                     return;
                 }
+
+                // Validate file is actually readable
+                if (file.size === 0) {
+                    console.error('[templateInput] File size is 0 - file may be corrupted');
+                    alert('The selected file appears to be empty or corrupted. Please try a different file.');
+                    e.target.value = ''; // Clear the input
+                    return;
+                }
+
                 console.log('[templateInput] File accepted, setting templateFile and calling displayTemplatePreview');
+                console.log('[templateInput] File instanceof File:', file instanceof File);
+                console.log('[templateInput] File instanceof Blob:', file instanceof Blob);
+
                 templateFile = file;
                 displayTemplatePreview(file);
             } else if (file) {
                 console.error('[templateInput] Invalid file type:', file.type, 'for file:', file.name);
                 alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
+                e.target.value = ''; // Clear the input
             }
         });
     } else {
@@ -245,7 +259,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB');
                     return;
                 }
+
+                // Validate file is actually readable
+                if (file.size === 0) {
+                    console.error('[templateUploadArea] File size is 0 - file may be corrupted');
+                    alert('The selected file appears to be empty or corrupted. Please try a different file.');
+                    return;
+                }
+
                 console.log('[templateUploadArea] File accepted, setting templateFile and calling displayTemplatePreview');
+                console.log('[templateUploadArea] File instanceof File:', file instanceof File);
+                console.log('[templateUploadArea] File instanceof Blob:', file instanceof Blob);
+
                 templateFile = file;
                 displayTemplatePreview(file);
             } else if (file) {
@@ -478,6 +503,9 @@ function displayTemplatePreview(file) {
         console.log('[displayTemplatePreview] Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
     };
 
+    // Capture file reference for error handler
+    var fileRef = file;
+
     templatePreviewImg.onerror = function(errorEvent) {
         console.error('[displayTemplatePreview] ✗ Failed to load template image');
         console.error('[displayTemplatePreview] Error event:', errorEvent);
@@ -497,10 +525,13 @@ function displayTemplatePreview(file) {
 
             reader.onerror = function(err) {
                 console.error('[displayTemplatePreview] FileReader also failed:', err);
+                console.error('[displayTemplatePreview] FileReader error details:', err);
                 alert('Failed to read the image file. Please try a different image or refresh the page.');
             };
 
-            reader.readAsDataURL(file);
+            // Use the captured file reference
+            console.log('[displayTemplatePreview] Reading file with FileReader:', fileRef.name);
+            reader.readAsDataURL(fileRef);
         } else {
             alert('Failed to display image preview. Please try again or use a different image.');
         }
@@ -508,27 +539,42 @@ function displayTemplatePreview(file) {
 
     // Use object URL for preview (faster than FileReader)
     try {
+        console.log('[displayTemplatePreview] Attempting to create object URL for file:', file.name);
+        console.log('[displayTemplatePreview] File object valid:', file instanceof File);
+        console.log('[displayTemplatePreview] File size:', file.size, 'bytes');
+
         var objectUrl = URL.createObjectURL(file);
-        console.log('[displayTemplatePreview] Created object URL:', objectUrl.substring(0, 50) + '...');
+        console.log('[displayTemplatePreview] ✓ Created object URL:', objectUrl.substring(0, 50) + '...');
 
         // Set src AFTER handlers are attached
         templatePreviewImg.src = objectUrl;
         console.log('[displayTemplatePreview] Object URL assigned to img.src');
     } catch (e) {
-        console.error('[displayTemplatePreview] Failed to create object URL:', e);
+        console.error('[displayTemplatePreview] ✗ Failed to create object URL:', e);
+        console.error('[displayTemplatePreview] Error name:', e.name);
+        console.error('[displayTemplatePreview] Error message:', e.message);
         console.log('[displayTemplatePreview] Using FileReader fallback immediately');
 
         // Fallback to FileReader
         var reader = new FileReader();
         reader.onload = function(evt) {
-            console.log('[displayTemplatePreview] FileReader successful, data URL length:', evt.target.result.length);
+            console.log('[displayTemplatePreview] ✓ FileReader successful, data URL length:', evt.target.result.length);
             templatePreviewImg.src = evt.target.result;
         };
         reader.onerror = function(err) {
-            console.error('[displayTemplatePreview] FileReader error:', err);
-            alert('Failed to read the image file. Please try again.');
+            console.error('[displayTemplatePreview] ✗ FileReader error:', err);
+            console.error('[displayTemplatePreview] FileReader error target:', err.target);
+            console.error('[displayTemplatePreview] FileReader error code:', err.target ? err.target.error : 'unknown');
+            alert('Failed to read the image file. Please try a different image or refresh the page.');
         };
-        reader.readAsDataURL(file);
+
+        console.log('[displayTemplatePreview] Starting FileReader.readAsDataURL for file:', file.name);
+        try {
+            reader.readAsDataURL(file);
+        } catch (readErr) {
+            console.error('[displayTemplatePreview] ✗ Exception when calling readAsDataURL:', readErr);
+            alert('Failed to read the image file. The file may be corrupted or inaccessible.');
+        }
     }
 }
 
