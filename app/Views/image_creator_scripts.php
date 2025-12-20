@@ -534,7 +534,18 @@ async function generateImage() {
 
     } catch (error) {
         console.error('Error generating image:', error);
-        alert('Failed to generate image. Please try again. Error: ' + error.message);
+        // Get error message with fallback for mobile browsers
+        let errorMessage = 'Unknown error occurred';
+        if (error) {
+            if (typeof error === 'string') {
+                errorMessage = error;
+            } else if (error.message) {
+                errorMessage = error.message;
+            } else if (error.toString && error.toString() !== '[object Object]') {
+                errorMessage = error.toString();
+            }
+        }
+        alert('Failed to generate image. Please try again.\n\nError: ' + errorMessage);
     } finally {
         document.getElementById('generateBtn').disabled = false;
         document.getElementById('loadingContainer').style.display = 'none';
@@ -579,11 +590,20 @@ function buildCompletePrompt(userPrompt) {
 /**
  * Convert file to base64 data URL
  * Converts AVIF and other formats to PNG for better compatibility
+ * Mobile-compatible with proper error handling
  */
 async function fileToBase64(file) {
     return new Promise((resolve, reject) => {
-        // Check if file needs conversion (AVIF, WEBP, etc.)
-        const needsConversion = file.type === 'image/avif' || file.type === 'image/webp';
+        if (!file) {
+            reject(new Error('No file provided for conversion'));
+            return;
+        }
+
+        // Check if file needs conversion (AVIF, WEBP, HEIC, etc.)
+        const fileType = file.type ? file.type.toLowerCase() : '';
+        const needsConversion = fileType === 'image/avif' || fileType === 'image/webp' ||
+                                fileType === 'image/heic' || fileType === 'image/heif' ||
+                                fileType === '';  // Unknown type on some mobile browsers
 
         if (needsConversion) {
             // Convert to PNG using canvas
@@ -592,26 +612,36 @@ async function fileToBase64(file) {
 
             reader.onload = (e) => {
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
 
-                    // Convert to PNG base64
-                    const pngDataUrl = canvas.toDataURL('image/png');
-                    resolve(pngDataUrl);
+                        // Convert to PNG base64
+                        const pngDataUrl = canvas.toDataURL('image/png');
+                        resolve(pngDataUrl);
+                    } catch (err) {
+                        reject(new Error('Failed to convert image: ' + (err.message || 'Canvas error')));
+                    }
                 };
-                img.onerror = reject;
+                img.onerror = () => reject(new Error('Failed to load image for conversion'));
                 img.src = e.target.result;
             };
-            reader.onerror = reject;
+            reader.onerror = () => reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
             reader.readAsDataURL(file);
         } else {
             // For JPEG, PNG, GIF - use directly
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
+            reader.onload = () => {
+                if (reader.result) {
+                    resolve(reader.result);
+                } else {
+                    reject(new Error('Failed to read file data'));
+                }
+            };
+            reader.onerror = () => reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
             reader.readAsDataURL(file);
         }
     });
@@ -713,47 +743,65 @@ async function callGeminiNanoBanana(prompt) {
         const csrfToken = document.querySelector('input[name="' + csrfTokenName + '"]').value;
 
         // Make API call to backend endpoint (keeps API key secure)
-        const response = await fetch('<?= base_url("image-creator/generate") ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-                ...requestBody,
-                [csrfTokenName]: csrfToken
-            })
-        });
-
-        const responseData = await response.json();
-
-        // Update CSRF token
-        if (responseData.csrf_token) {
-            document.querySelector('input[name="' + csrfTokenName + '"]').value = responseData.csrf_token;
+        let response;
+        try {
+            response = await fetch('<?= base_url("image-creator/generate") ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    ...requestBody,
+                    [csrfTokenName]: csrfToken
+                })
+            });
+        } catch (networkError) {
+            console.error('Network error:', networkError);
+            throw new Error('Network error: Please check your internet connection and try again.');
         }
 
-        if (!responseData.success) {
-            throw new Error(responseData.error || 'API request failed');
+        let responseData;
+        try {
+            responseData = await response.json();
+        } catch (parseError) {
+            console.error('Response parse error:', parseError);
+            throw new Error('Server response error. Please try again.');
+        }
+
+        // Update CSRF token
+        if (responseData && responseData.csrf_token) {
+            const csrfInput = document.querySelector('input[name="' + csrfTokenName + '"]');
+            if (csrfInput) {
+                csrfInput.value = responseData.csrf_token;
+            }
+        }
+
+        if (!responseData || !responseData.success) {
+            throw new Error(responseData?.error || 'API request failed');
         }
 
         const data = responseData.data;
         console.log('API Response:', data);
 
         // Extract the generated image from the response
-        if (data.choices && data.choices[0] && data.choices[0].message) {
+        if (data && data.choices && data.choices[0] && data.choices[0].message) {
             const message = data.choices[0].message;
 
             // Check if images were generated
             if (message.images && message.images.length > 0) {
                 // Return the first generated image (base64 data URL)
-                const imageUrl = message.images[0].image_url.url;
+                const imageUrl = message.images[0].image_url?.url || message.images[0].url;
+                if (!imageUrl) {
+                    throw new Error('Image URL not found in response');
+                }
                 console.log('Generated image received successfully');
                 return imageUrl;
             }
             // If no images but there's text content
             else if (message.content) {
                 console.log('Text response:', message.content);
-                throw new Error('Model returned text instead of image. Response: ' + message.content);
+                throw new Error('Model returned text instead of image. Response: ' + message.content.substring(0, 100));
             }
             else {
                 throw new Error('No image generated in the response');
@@ -764,7 +812,12 @@ async function callGeminiNanoBanana(prompt) {
 
     } catch (error) {
         console.error('Error calling OpenRouter API:', error);
-        throw error;
+        // Ensure we always throw an error with a message
+        if (error && error.message) {
+            throw error;
+        } else {
+            throw new Error('An unexpected error occurred during image generation');
+        }
     }
 }
 
