@@ -75,203 +75,12 @@ function isValidImageFile(file) {
 }
 
 /**
- * Check if file is HEIC/HEIF format (common on iPhones)
+ * Create a simple blob URL for image preview
+ * No conversion - just display the raw image
  */
-function isHeicFile(file) {
-    if (!file) return false;
-    var fileType = (file.type || '').toLowerCase();
-    var fileName = (file.name || '').toLowerCase();
-    return fileType.includes('heic') || fileType.includes('heif') ||
-           fileName.endsWith('.heic') || fileName.endsWith('.heif');
-}
-
-/**
- * Convert ANY image file to JPEG format using Canvas
- * Returns a Promise that resolves to {blob: Blob, base64: string, file: File}
- * - blob: The JPEG blob for creating File objects
- * - base64: The base64 data URL for preview display
- * - file: A new File object with .jpg extension
- *
- * Mobile-compatible: Uses FileReader instead of URL.createObjectURL for better compatibility
- */
-function convertImageToJpeg(file) {
-    return new Promise(function(resolve, reject) {
-        if (!file) {
-            console.error('[convertImageToJpeg] No file provided');
-            reject(new Error('No file provided'));
-            return;
-        }
-
-        console.log('[convertImageToJpeg] Starting conversion:', file.name, 'Type:', file.type, 'Size:', file.size);
-
-        // Helper function to convert base64 data URL to JPEG using Canvas
-        function processWithCanvas(dataUrl, originalFile) {
-            console.log('[convertImageToJpeg] Processing with Canvas...');
-
-            var img = new Image();
-
-            img.onload = function() {
-                console.log('[convertImageToJpeg] Image loaded, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-
-                try {
-                    // Create canvas with image dimensions
-                    var canvas = document.createElement('canvas');
-                    canvas.width = img.naturalWidth;
-                    canvas.height = img.naturalHeight;
-
-                    var ctx = canvas.getContext('2d');
-                    if (!ctx) {
-                        console.error('[convertImageToJpeg] Failed to get canvas context');
-                        reject(new Error('Canvas not supported'));
-                        return;
-                    }
-
-                    // Fill with white background (for transparency in PNG/GIF)
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    // Draw the image
-                    ctx.drawImage(img, 0, 0);
-
-                    console.log('[convertImageToJpeg] Canvas drawn, converting to JPEG blob...');
-
-                    // Convert canvas to JPEG blob
-                    canvas.toBlob(function(jpegBlob) {
-                        if (!jpegBlob) {
-                            console.error('[convertImageToJpeg] toBlob returned null');
-                            reject(new Error('Failed to convert canvas to JPEG blob'));
-                            return;
-                        }
-
-                        console.log('[convertImageToJpeg] JPEG blob created, size:', jpegBlob.size);
-
-                        // Create a new File object with .jpg extension
-                        var originalName = originalFile.name.replace(/\.[^/.]+$/, ''); // Remove extension
-                        var newFileName = originalName + '.jpg';
-                        var jpegFile = new File([jpegBlob], newFileName, { type: 'image/jpeg' });
-
-                        // Convert to base64 for preview
-                        var reader = new FileReader();
-                        reader.onload = function(e) {
-                            console.log('[convertImageToJpeg] Conversion complete:', newFileName);
-                            resolve({
-                                blob: jpegBlob,
-                                base64: e.target.result,
-                                file: jpegFile,
-                                originalName: originalFile.name
-                            });
-                        };
-                        reader.onerror = function(err) {
-                            console.error('[convertImageToJpeg] FileReader error on final base64:', err);
-                            reject(new Error('Failed to create base64 preview'));
-                        };
-                        reader.readAsDataURL(jpegBlob);
-
-                    }, 'image/jpeg', 0.8); // 80% quality
-
-                } catch (canvasError) {
-                    console.error('[convertImageToJpeg] Canvas processing error:', canvasError);
-                    reject(canvasError);
-                }
-            };
-
-            img.onerror = function(e) {
-                console.error('[convertImageToJpeg] Failed to load image into Image element:', e);
-                reject(new Error('Failed to load image for conversion'));
-            };
-
-            // Set crossOrigin to anonymous to avoid CORS issues
-            img.crossOrigin = 'anonymous';
-            img.src = dataUrl;
-        }
-
-        // Check if HEIC/HEIF - need to convert first using heic2any
-        if (isHeicFile(file)) {
-            console.log('[convertImageToJpeg] HEIC file detected, using heic2any first...');
-
-            if (typeof heic2any === 'undefined') {
-                console.error('[convertImageToJpeg] heic2any library not loaded! Check CDN.');
-                reject(new Error('HEIC conversion library not available. Please check your internet connection.'));
-                return;
-            }
-
-            heic2any({
-                blob: file,
-                toType: 'image/jpeg',
-                quality: 0.8
-            }).then(function(convertedBlob) {
-                console.log('[convertImageToJpeg] HEIC converted by heic2any, size:', convertedBlob.size);
-                // For HEIC, heic2any already gives us JPEG, just need base64
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var originalName = file.name.replace(/\.[^/.]+$/, '');
-                    var newFileName = originalName + '.jpg';
-                    var jpegFile = new File([convertedBlob], newFileName, { type: 'image/jpeg' });
-                    console.log('[convertImageToJpeg] HEIC conversion complete:', newFileName);
-                    resolve({
-                        blob: convertedBlob,
-                        base64: e.target.result,
-                        file: jpegFile,
-                        originalName: file.name
-                    });
-                };
-                reader.onerror = function(err) {
-                    console.error('[convertImageToJpeg] FileReader error on HEIC base64:', err);
-                    reject(new Error('Failed to read converted HEIC image'));
-                };
-                reader.readAsDataURL(convertedBlob);
-            }).catch(function(err) {
-                console.error('[convertImageToJpeg] HEIC conversion failed:', err);
-                reject(new Error('Failed to convert HEIC image: ' + (err.message || err)));
-            });
-        } else {
-            // Standard format - read file as data URL first (more reliable on mobile)
-            console.log('[convertImageToJpeg] Reading file as data URL...');
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                console.log('[convertImageToJpeg] File read complete, processing with canvas...');
-                processWithCanvas(e.target.result, file);
-            };
-            reader.onerror = function(err) {
-                console.error('[convertImageToJpeg] FileReader error:', err);
-                reject(new Error('Failed to read image file'));
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-}
-
-/**
- * Convert multiple image files to JPEG format
- * Returns a Promise that resolves to an array of conversion results
- */
-function convertImagesToJpeg(files) {
-    if (!files || files.length === 0) {
-        return Promise.resolve([]);
-    }
-
-    var promises = files.map(function(file, index) {
-        return convertImageToJpeg(file).then(function(result) {
-            return {
-                index: index,
-                base64: result.base64,
-                file: result.file,
-                originalName: result.originalName,
-                success: true
-            };
-        }).catch(function(err) {
-            console.error('[convertImagesToJpeg] Failed to convert file:', file.name, err);
-            return {
-                index: index,
-                base64: null,
-                file: null,
-                originalName: file.name,
-                success: false,
-                error: err.message
-            };
-        });
-    });
-
-    return Promise.all(promises);
+function createPreviewUrl(file) {
+    if (!file) return null;
+    return URL.createObjectURL(file);
 }
 
 /**
@@ -384,8 +193,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const templateUploadArea = document.getElementById('templateUploadArea');
 
     if (templateInput) {
-        templateInput.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
+        templateInput.addEventListener('change', function(e) {
+            var file = e.target.files[0];
             if (!file) return;
 
             if (!isValidImageFile(file)) {
@@ -400,26 +209,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (file.size === 0) {
-                alert('The selected file appears to be empty or corrupted.');
-                e.target.value = '';
-                return;
-            }
-
-            // Convert image to JPEG and get base64 for preview
-            console.log('[Template Upload] Converting to JPEG:', file.name, 'Type:', file.type, 'Size:', file.size);
-            try {
-                var result = await convertImageToJpeg(file);
-                // Store converted JPEG file for API use
-                templateFile = result.file;
-                console.log('[Template Upload] Conversion successful, displaying preview...');
-                // Display preview using base64
-                displayTemplatePreview(result.base64, result.file.name);
-            } catch (err) {
-                console.error('[Template Upload] Conversion failed:', err);
-                var errorMsg = err.message || 'Unknown error';
-                alert('Failed to process image: ' + errorMsg + '\n\nPlease try another file or a different format.');
-            }
+            // Store raw file and display preview
+            templateFile = file;
+            var previewUrl = createPreviewUrl(file);
+            displayTemplatePreview(previewUrl, file.name);
         });
     }
 
@@ -435,11 +228,11 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.borderColor = '#d0d0d0';
         });
 
-        templateUploadArea.addEventListener('drop', async function(e) {
+        templateUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
 
-            const file = e.dataTransfer.files[0];
+            var file = e.dataTransfer.files[0];
             if (!file) return;
 
             if (!isValidImageFile(file)) {
@@ -452,25 +245,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (file.size === 0) {
-                alert('The selected file appears to be empty or corrupted.');
-                return;
-            }
-
-            // Convert image to JPEG and get base64 for preview
-            console.log('[Template Drag-Drop] Converting to JPEG:', file.name, 'Type:', file.type, 'Size:', file.size);
-            try {
-                var result = await convertImageToJpeg(file);
-                // Store converted JPEG file for API use
-                templateFile = result.file;
-                console.log('[Template Drag-Drop] Conversion successful, displaying preview...');
-                // Display preview using base64
-                displayTemplatePreview(result.base64, result.file.name);
-            } catch (err) {
-                console.error('[Template Drag-Drop] Conversion failed:', err);
-                var errorMsg = err.message || 'Unknown error';
-                alert('Failed to process image: ' + errorMsg + '\n\nPlease try another file or a different format.');
-            }
+            // Store raw file and display preview
+            templateFile = file;
+            var previewUrl = createPreviewUrl(file);
+            displayTemplatePreview(previewUrl, file.name);
         });
     }
 
@@ -479,12 +257,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var productUploadArea = document.getElementById('productUploadArea');
 
     if (productImagesInput) {
-        productImagesInput.addEventListener('change', async function(e) {
+        productImagesInput.addEventListener('change', function(e) {
             var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
+            // Validate and store files
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -495,30 +272,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                validFiles.push(file);
+                productFiles.push(file);
             }
 
-            if (validFiles.length === 0) return;
-
-            console.log('[Product Upload] Converting', validFiles.length, 'files to JPEG...');
-
-            // Convert all images to JPEG
-            var results = await convertImagesToJpeg(validFiles);
-
-            // Store converted files and collect previews
-            var previews = [];
-            results.forEach(function(result) {
-                if (result.success && result.file) {
-                    productFiles.push(result.file);
-                    previews.push({
-                        base64: result.base64,
-                        name: result.file.name
-                    });
-                }
-            });
-
-            console.log('[Product Upload] Converted', previews.length, 'files successfully');
-            displayProductPreviews(previews);
+            displayProductPreviews();
         });
     }
 
@@ -534,15 +291,14 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.borderColor = '#d0d0d0';
         });
 
-        productUploadArea.addEventListener('drop', async function(e) {
+        productUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
 
             var files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
+            // Validate and store files
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -553,44 +309,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                validFiles.push(file);
+                productFiles.push(file);
             }
 
-            if (validFiles.length === 0) return;
-
-            console.log('[Product Drag-Drop] Converting', validFiles.length, 'files to JPEG...');
-
-            // Convert all images to JPEG
-            var results = await convertImagesToJpeg(validFiles);
-
-            // Store converted files and collect previews
-            var previews = [];
-            results.forEach(function(result) {
-                if (result.success && result.file) {
-                    productFiles.push(result.file);
-                    previews.push({
-                        base64: result.base64,
-                        name: result.file.name
-                    });
-                }
-            });
-
-            console.log('[Product Drag-Drop] Converted', previews.length, 'files successfully');
-            displayProductPreviews(previews);
+            displayProductPreviews();
         });
     }
 
     // Base image upload (for edit mode) - supports multiple images
-    const baseImageInput = document.getElementById('baseImageInput');
-    const baseImageUploadArea = document.getElementById('baseImageUploadArea');
+    var baseImageInput = document.getElementById('baseImageInput');
+    var baseImageUploadArea = document.getElementById('baseImageUploadArea');
 
     if (baseImageInput) {
-        baseImageInput.addEventListener('change', async function(e) {
-            const files = Array.from(e.target.files);
+        baseImageInput.addEventListener('change', function(e) {
+            var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
+            // Validate and store files
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -601,24 +336,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                validFiles.push(file);
+                baseImageFiles.push(file);
             }
 
-            if (validFiles.length === 0) return;
-
-            console.log('[Base Image Upload] Converting', validFiles.length, 'files to JPEG...');
-
-            // Convert all images to JPEG
-            var results = await convertImagesToJpeg(validFiles);
-
-            // Store converted files
-            results.forEach(function(result) {
-                if (result.success && result.file) {
-                    baseImageFiles.push(result.file);
-                }
-            });
-
-            await displayBaseImagePreviews();
+            displayBaseImagePreviews();
         });
     }
 
@@ -634,15 +355,14 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.borderColor = '#d0d0d0';
         });
 
-        baseImageUploadArea.addEventListener('drop', async function(e) {
+        baseImageUploadArea.addEventListener('drop', function(e) {
             e.preventDefault();
             this.style.borderColor = '#d0d0d0';
 
-            const files = Array.from(e.dataTransfer.files);
+            var files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
+            // Validate and store files
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 if (!isValidImageFile(file)) {
@@ -653,24 +373,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('File size must be less than 5MB: ' + file.name);
                     continue;
                 }
-                validFiles.push(file);
+                baseImageFiles.push(file);
             }
 
-            if (validFiles.length === 0) return;
-
-            console.log('[Base Image Drag-Drop] Converting', validFiles.length, 'files to JPEG...');
-
-            // Convert all images to JPEG
-            var results = await convertImagesToJpeg(validFiles);
-
-            // Store converted files
-            results.forEach(function(result) {
-                if (result.success && result.file) {
-                    baseImageFiles.push(result.file);
-                }
-            });
-
-            await displayBaseImagePreviews();
+            displayBaseImagePreviews();
         });
     }
 
@@ -712,33 +418,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview using base64 data URL
- * All images are pre-converted to JPEG format
+ * Display template preview using blob URL
  */
-function displayTemplatePreview(base64Url, fileName) {
-    console.log('[displayTemplatePreview] Displaying preview for:', fileName);
-
+function displayTemplatePreview(previewUrl, fileName) {
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
     var templatePreviewImg = document.getElementById('templatePreviewImg');
 
-    if (!templatePreviewImg) {
-        console.error('[displayTemplatePreview] Preview element not found!');
-        return;
-    }
+    if (!templatePreviewImg) return;
 
     // Hide upload label, show preview container
     if (uploadLabel) uploadLabel.style.display = 'none';
     if (templatePreview) templatePreview.style.display = 'block';
 
-    // Set the base64 image source
-    templatePreviewImg.src = base64Url;
+    // Set the image source
+    templatePreviewImg.src = previewUrl;
     templatePreviewImg.alt = fileName;
-    templatePreviewImg.onload = function() {
-        console.log('[displayTemplatePreview] Image loaded successfully!');
-    };
-
-    console.log('[displayTemplatePreview] Preview setup complete');
 }
 
 /**
@@ -756,48 +451,24 @@ function removeTemplate() {
 }
 
 /**
- * Display base image previews (for edit mode with multiple images)
- * Uses base64 data URLs - all images pre-converted to JPEG
+ * Display base image previews using blob URLs
  */
-async function displayBaseImagePreviews() {
-    console.log('[displayBaseImagePreviews] Called with', baseImageFiles.length, 'files');
-
+function displayBaseImagePreviews() {
     var container = document.getElementById('baseImagePreviews');
-    if (!container) {
-        console.error('[displayBaseImagePreviews] Container not found!');
-        return;
-    }
+    if (!container) return;
 
     container.innerHTML = '';
 
-    if (baseImageFiles.length === 0) {
-        console.log('[displayBaseImagePreviews] No files');
-        return;
-    }
-
-    // Convert files to get base64 previews
-    var results = await convertImagesToJpeg(baseImageFiles);
-
-    // Update baseImageFiles with converted files
-    baseImageFiles = results.filter(function(r) { return r.success; }).map(function(r) { return r.file; });
+    if (baseImageFiles.length === 0) return;
 
     // Create preview for each image
-    results.forEach(function(result, index) {
-        if (!result.success) return;
-
-        console.log('[displayBaseImagePreviews] Creating preview', index + 1);
-
+    baseImageFiles.forEach(function(file, index) {
         var div = document.createElement('div');
         div.className = 'base-image-preview-item' + (index === primaryImageIndex ? ' primary' : '');
 
         var img = document.createElement('img');
-        img.alt = result.file.name;
-        img.src = result.base64;
-
-        img.onload = function() {
-            console.log('[displayBaseImagePreviews] Base image', index + 1, 'loaded successfully');
-        };
-
+        img.alt = file.name;
+        img.src = createPreviewUrl(file);
         div.appendChild(img);
 
         // Add star button for primary selection
@@ -828,16 +499,13 @@ async function displayBaseImagePreviews() {
 
         container.appendChild(div);
     });
-
-    console.log('[displayBaseImagePreviews] All previews created');
 }
 
 /**
  * Set primary image for editing
  */
-async function setPrimaryImage(index) {
+function setPrimaryImage(index) {
     primaryImageIndex = index;
-    // Just update the visual state, no need to re-convert
     var container = document.getElementById('baseImagePreviews');
     if (container) {
         var items = container.querySelectorAll('.base-image-preview-item');
@@ -858,7 +526,7 @@ async function setPrimaryImage(index) {
 /**
  * Remove base image
  */
-async function removeBaseImage(index) {
+function removeBaseImage(index) {
     baseImageFiles.splice(index, 1);
 
     // Adjust primary index if needed
@@ -872,32 +540,23 @@ async function removeBaseImage(index) {
         primaryImageIndex = 0;
     }
 
-    await displayBaseImagePreviews();
+    displayBaseImagePreviews();
 }
 
 /**
- * Display product image previews using base64 data URLs
- * All images are pre-converted to JPEG format
- * @param {Array} previews - Array of {base64: string, name: string} objects
+ * Display product image previews using blob URLs
  */
-function displayProductPreviews(previews) {
-    console.log('[displayProductPreviews] Called with', previews ? previews.length : 0, 'previews');
-    console.log('[displayProductPreviews] productFiles count:', productFiles.length);
-
+function displayProductPreviews() {
     var container = document.getElementById('productPreviews');
     var uploadArea = document.getElementById('productUploadArea');
     var placeholder = document.getElementById('productUploadPlaceholder');
     var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
-    if (!container) {
-        console.error('[displayProductPreviews] Container not found!');
-        return;
-    }
+    if (!container) return;
 
     container.innerHTML = '';
 
-    // Use productFiles as the source of truth for display
     var totalFiles = productFiles.length;
 
     // Show/hide elements based on whether there are files
@@ -923,67 +582,39 @@ function displayProductPreviews(previews) {
         productCountSpan.textContent = totalFiles;
     }
 
-    // Create preview for each image - use previews array if provided, otherwise generate from files
-    if (previews && previews.length > 0) {
-        previews.forEach(function(result, index) {
-            createProductPreviewElement(container, result.base64, result.name, index);
-        });
-    }
+    // Create preview for each file
+    productFiles.forEach(function(file, index) {
+        var div = document.createElement('div');
+        div.className = 'product-preview-item';
+        div.setAttribute('data-index', index);
 
-    console.log('[displayProductPreviews] All', totalFiles, 'previews created');
-}
+        var img = document.createElement('img');
+        img.alt = file.name;
+        img.src = createPreviewUrl(file);
+        div.appendChild(img);
 
-/**
- * Helper function to create a single product preview element
- */
-function createProductPreviewElement(container, base64Src, name, index) {
-    var div = document.createElement('div');
-    div.className = 'product-preview-item';
-    div.setAttribute('data-index', index);
+        // Add remove button
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-danger btn-sm remove-btn';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.onclick = function() {
+            removeProductImage(index);
+        };
+        div.appendChild(removeBtn);
 
-    var img = document.createElement('img');
-    img.alt = name || ('Product ' + (index + 1));
-    img.src = base64Src;
-
-    img.onload = function() {
-        console.log('[displayProductPreviews] Product image', index + 1, 'loaded successfully');
-    };
-
-    div.appendChild(img);
-
-    // Add remove button
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn btn-danger btn-sm remove-btn';
-    removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-    removeBtn.onclick = function() {
-        removeProductImage(index);
-    };
-    div.appendChild(removeBtn);
-
-    container.appendChild(div);
+        container.appendChild(div);
+    });
 }
 
 /**
  * Remove product image and rebuild previews
  */
-async function removeProductImage(index) {
+function removeProductImage(index) {
     if (index >= 0 && index < productFiles.length) {
         productFiles.splice(index, 1);
     }
-
-    // Re-convert remaining files to get base64 previews
-    if (productFiles.length > 0) {
-        var results = await convertImagesToJpeg(productFiles);
-        var previews = results.filter(function(r) { return r.success; }).map(function(r) {
-            return { base64: r.base64, name: r.file.name };
-        });
-        // Update productFiles with converted files
-        productFiles = results.filter(function(r) { return r.success; }).map(function(r) { return r.file; });
-        displayProductPreviews(previews);
-    } else {
-        displayProductPreviews([]);
-    }
+    displayProductPreviews();
 }
 
 /**
