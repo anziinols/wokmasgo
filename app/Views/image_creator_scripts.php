@@ -903,7 +903,7 @@ function compressImage(file, maxWidth, maxHeight, quality) {
 
 /**
  * Convert file to base64 data URL
- * Compresses images for mobile compatibility
+ * Preserves original image quality - NO compression or resizing
  * Uses ES5-compatible syntax for older mobile browsers
  */
 function fileToBase64(file) {
@@ -911,13 +911,15 @@ function fileToBase64(file) {
         var fileName = file ? file.name : 'null';
         var fileSize = file ? file.size : 0;
         var fileSizeKB = Math.round(fileSize / 1024);
+        var fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
         var fileType = file ? (file.type || 'unknown') : 'unknown';
 
         console.log('[fileToBase64] ========================================');
         console.log('[fileToBase64] Processing file:', fileName);
-        console.log('[fileToBase64] File size:', fileSizeKB, 'KB');
+        console.log('[fileToBase64] File size:', fileSizeKB, 'KB (' + fileSizeMB + ' MB)');
         console.log('[fileToBase64] File type:', fileType);
         console.log('[fileToBase64] File object valid:', !!file);
+        console.log('[fileToBase64] Mode: DIRECT READ (no compression)');
 
         if (!file) {
             console.error('[fileToBase64] No file provided!');
@@ -932,45 +934,18 @@ function fileToBase64(file) {
             return;
         }
 
-        // Check file size - warn if over 2MB
-        if (fileSize > 2 * 1024 * 1024) {
-            console.warn('[fileToBase64] Large file detected (' + fileSizeKB + 'KB), will compress');
+        // Log large file warning but still process at original quality
+        if (fileSize > 5 * 1024 * 1024) {
+            console.warn('[fileToBase64] Large file detected (' + fileSizeMB + ' MB) - sending original quality to AI');
         }
 
-        // Check if running on mobile
+        // Log device type for debugging
         var isMobile = isMobileDevice();
         console.log('[fileToBase64] Is mobile device:', isMobile);
 
-        // Check if file is HEIC/HEIF (iOS photos)
-        var isHeic = fileType === 'image/heic' || fileType === 'image/heif' ||
-                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
-
-        if (isHeic) {
-            console.log('[fileToBase64] HEIC/HEIF format detected - using direct read');
-            // HEIC files can't be compressed via canvas, use direct read
-            directFileRead(file, resolve, reject);
-            return;
-        }
-
-        // For mobile or large files, try compression first
-        var shouldCompress = isMobile || fileSize > 1024 * 1024; // Compress if mobile or > 1MB
-
-        if (shouldCompress) {
-            console.log('[fileToBase64] Attempting compression...');
-            compressImage(file, 1600, 1600, 0.8)
-                .then(function(dataUrl) {
-                    console.log('[fileToBase64] Compression successful, result size:', Math.round(dataUrl.length / 1024), 'KB');
-                    resolve(dataUrl);
-                })
-                .catch(function(err) {
-                    console.warn('[fileToBase64] Compression failed:', getErrorMessage(err));
-                    console.log('[fileToBase64] Falling back to direct read...');
-                    directFileRead(file, resolve, reject);
-                });
-        } else {
-            console.log('[fileToBase64] Using direct read (desktop/small file)');
-            directFileRead(file, resolve, reject);
-        }
+        // Always use direct read - preserve original image quality for AI processing
+        console.log('[fileToBase64] Using direct read - preserving original image quality');
+        directFileRead(file, resolve, reject);
     });
 }
 
