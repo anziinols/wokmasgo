@@ -796,26 +796,58 @@ function displayProductPreviews() {
         return;
     }
 
+    // Special logging for single file case (the reported bug)
+    if (productFiles.length === 1) {
+        console.warn('[displayProductPreviews] ⚠️ SINGLE FILE CASE - This is the reported bug scenario');
+        console.warn('[displayProductPreviews] File:', productFiles[0].name, 'Size:', productFiles[0].size, 'Type:', productFiles[0].type);
+    }
+
     // Hide placeholder, show inline previews
-    if (placeholder) placeholder.style.display = 'none';
-    if (previewsInline) previewsInline.style.display = 'flex';
-    if (uploadArea) uploadArea.classList.add('has-images');
+    console.log('[displayProductPreviews] Hiding placeholder, showing previews...');
+    if (placeholder) {
+        placeholder.style.display = 'none';
+        console.log('[displayProductPreviews] ✓ Placeholder hidden');
+    } else {
+        console.error('[displayProductPreviews] ✗ Placeholder element not found!');
+    }
+
+    if (previewsInline) {
+        previewsInline.style.display = 'flex';
+        console.log('[displayProductPreviews] ✓ PreviewsInline set to display: flex');
+        console.log('[displayProductPreviews] PreviewsInline computed display:', window.getComputedStyle(previewsInline).display);
+    } else {
+        console.error('[displayProductPreviews] ✗ PreviewsInline element not found!');
+    }
+
+    if (uploadArea) {
+        uploadArea.classList.add('has-images');
+        console.log('[displayProductPreviews] ✓ UploadArea class "has-images" added');
+    } else {
+        console.error('[displayProductPreviews] ✗ UploadArea element not found!');
+    }
 
     // Update count badge
     if (productCountSpan) {
         productCountSpan.style.display = 'inline-block';
         productCountSpan.textContent = productFiles.length;
+        console.log('[displayProductPreviews] ✓ Count badge updated to:', productFiles.length);
     }
     console.log('[displayProductPreviews] Showing', productFiles.length, 'preview(s) inline');
 
     // Process each file using URL.createObjectURL (faster than FileReader for previews)
+    console.log('[displayProductPreviews] Starting loop to create', productFiles.length, 'preview item(s)');
     for (var i = 0; i < productFiles.length; i++) {
         (function(index, file) {
-            console.log('[displayProductPreviews] Processing file', index + 1, ':', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+            console.log('[displayProductPreviews] ----------------------------------------');
+            console.log('[displayProductPreviews] Processing file', index + 1, 'of', productFiles.length);
+            console.log('[displayProductPreviews] File name:', file.name);
+            console.log('[displayProductPreviews] File size:', Math.round(file.size / 1024), 'KB');
+            console.log('[displayProductPreviews] File type:', file.type);
 
             var div = document.createElement('div');
             div.className = 'product-preview-item';
             div.setAttribute('data-index', index);
+            console.log('[displayProductPreviews] ✓ Created preview div for file', index + 1);
 
             // Create image element using object URL (much faster than FileReader)
             var img = document.createElement('img');
@@ -874,11 +906,28 @@ function displayProductPreviews() {
             };
 
             div.appendChild(removeBtn);
-            container.appendChild(div);
+            console.log('[displayProductPreviews] ✓ Remove button added to preview div');
 
-            console.log('[displayProductPreviews] Preview added for file', index + 1);
+            container.appendChild(div);
+            console.log('[displayProductPreviews] ✓ Preview div appended to container');
+            console.log('[displayProductPreviews] Container now has', container.children.length, 'child element(s)');
+
+            // Special check for single file case
+            if (productFiles.length === 1) {
+                console.warn('[displayProductPreviews] ⚠️ SINGLE FILE: Preview item created and appended');
+                console.warn('[displayProductPreviews] Container innerHTML length:', container.innerHTML.length);
+                console.warn('[displayProductPreviews] Container display:', window.getComputedStyle(container).display);
+                console.warn('[displayProductPreviews] Container visibility:', window.getComputedStyle(container).visibility);
+                console.warn('[displayProductPreviews] Container parent (previewsInline) display:', window.getComputedStyle(container.parentElement).display);
+            }
+
+            console.log('[displayProductPreviews] ✓ Preview added for file', index + 1);
         })(i, productFiles[i]);
     }
+
+    console.log('[displayProductPreviews] ========================================');
+    console.log('[displayProductPreviews] ✓ COMPLETE: All', productFiles.length, 'preview(s) processed');
+    console.log('[displayProductPreviews] Final container children count:', container.children.length);
 }
 
 /**
