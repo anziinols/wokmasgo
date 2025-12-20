@@ -1810,6 +1810,10 @@ function refreshPage() {
         templatePreview.style.display = 'none';
         const templatePreviewImg = document.getElementById('templatePreviewImg');
         if (templatePreviewImg) {
+            // Remove event handlers to prevent errors when clearing src
+            templatePreviewImg.onload = null;
+            templatePreviewImg.onerror = null;
+
             // Revoke object URL if it exists
             if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
                 try {
@@ -1884,6 +1888,10 @@ function refreshPage() {
 
     const generatedImage = document.getElementById('generatedImage');
     if (generatedImage) {
+        // Remove event handlers to prevent errors when clearing src
+        generatedImage.onload = null;
+        generatedImage.onerror = null;
+
         // Revoke object URL if it exists
         if (generatedImage.src && generatedImage.src.startsWith('blob:')) {
             try {
