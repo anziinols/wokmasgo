@@ -43,7 +43,8 @@ function isMobileDevice() {
 }
 
 /**
- * Validate if file is a supported image format - simplified
+ * Validate if file is a supported image format - mobile friendly
+ * Includes common phone formats like HEIC/HEIF in addition to JPG/PNG/etc.
  */
 function isValidImageFile(file) {
     if (!file) return false;
@@ -51,14 +52,23 @@ function isValidImageFile(file) {
     var fileType = file.type ? file.type.toLowerCase() : '';
     var fileName = file.name ? file.name.toLowerCase() : '';
 
-    // Check MIME type
-    var validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
-    if (fileType && validTypes.includes(fileType)) {
+    // Check MIME type first
+    var validTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/avif',
+        'image/heic',
+        'image/heif'
+    ];
+    if (fileType && validTypes.indexOf(fileType) !== -1) {
         return true;
     }
 
     // Fallback: check file extension
-    var validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'];
+    var validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.heic', '.heif'];
     return validExtensions.some(function(ext) {
         return fileName.endsWith(ext);
     });
@@ -179,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!file) return;
 
             if (!isValidImageFile(file)) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF, HEIC/HEIF)');
                 e.target.value = '';
                 return;
             }
@@ -200,10 +210,16 @@ document.addEventListener('DOMContentLoaded', function() {
             templateFile = file;
 
             // Create Object URL for preview (no FileReader needed - instant!)
-            const objectUrl = URL.createObjectURL(file);
-            console.log('[Template Upload] Created Object URL:', objectUrl);
+            let objectUrl = null;
+            try {
+                objectUrl = URL.createObjectURL(file);
+                console.log('[Template Upload] Created Object URL:', objectUrl);
+            } catch (err) {
+                console.error('[Template Upload] Failed to create Object URL:', err);
+                objectUrl = null; // will trigger FileReader fallback in preview
+            }
             console.log('[Template Upload] File name:', file.name);
-            displayTemplatePreview(objectUrl, file.name);
+            displayTemplatePreview(objectUrl, file.name, file);
         });
     }
 
@@ -227,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!file) return;
 
             if (!isValidImageFile(file)) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF)');
+                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF, HEIC/HEIF)');
                 return;
             }
 
@@ -245,8 +261,14 @@ document.addEventListener('DOMContentLoaded', function() {
             templateFile = file;
 
             // Create Object URL for preview (no FileReader needed - instant!)
-            const objectUrl = URL.createObjectURL(file);
-            displayTemplatePreview(objectUrl, file.name);
+            let objectUrl = null;
+            try {
+                objectUrl = URL.createObjectURL(file);
+            } catch (err) {
+                console.error('[Template Drag-Drop] Failed to create Object URL:', err);
+                objectUrl = null;
+            }
+            displayTemplatePreview(objectUrl, file.name, file);
         });
     }
 
@@ -278,8 +300,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create Object URLs for preview (no FileReader needed - instant!)
             var objectUrls = productFiles.map(function(file) {
-                var url = URL.createObjectURL(file);
-                console.log('[Product Upload] Created Object URL for', file.name, ':', url);
+                var url = null;
+                try {
+                    url = URL.createObjectURL(file);
+                    console.log('[Product Upload] Created Object URL for', file.name, ':', url);
+                } catch (err) {
+                    console.error('[Product Upload] Failed to create Object URL for', file.name, ':', err);
+                    url = null; // will trigger FileReader fallback in preview
+                }
                 return {
                     url: url,
                     name: file.name
@@ -329,8 +357,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create Object URLs for preview (no FileReader needed - instant!)
             var objectUrls = productFiles.map(function(file) {
-                var url = URL.createObjectURL(file);
-                console.log('[Product Drag-Drop] Created Object URL for', file.name, ':', url);
+                var url = null;
+                try {
+                    url = URL.createObjectURL(file);
+                    console.log('[Product Drag-Drop] Created Object URL for', file.name, ':', url);
+                } catch (err) {
+                    console.error('[Product Drag-Drop] Failed to create Object URL for', file.name, ':', err);
+                    url = null; // will trigger FileReader fallback in preview
+                }
                 return {
                     url: url,
                     name: file.name
@@ -357,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     baseImageFiles.push(file);
                 } else {
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
+                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC/HEIF');
                 }
             });
             displayBaseImagePreviews();
@@ -388,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     baseImageFiles.push(file);
                 } else {
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, or AVIF');
+                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC/HEIF');
                 }
             });
             displayBaseImagePreviews();
@@ -433,9 +467,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Display template preview - receives Object URL
+ * Display template preview - receives Object URL with FileReader fallback
+ * This helps when mobile browsers or CSP block blob: URLs.
  */
-function displayTemplatePreview(objectUrl, fileName) {
+function displayTemplatePreview(objectUrl, fileName, file) {
     console.log('[displayTemplatePreview] Called with objectUrl:', objectUrl, 'fileName:', fileName);
 
     var uploadLabel = document.getElementById('templateUploadLabel');
@@ -448,10 +483,36 @@ function displayTemplatePreview(objectUrl, fileName) {
         return;
     }
 
-    if (!objectUrl) {
-        console.error('[displayTemplatePreview] No objectUrl provided!');
-        alert('Invalid image data. Please try again.');
-        return;
+    // Helper: fallback using FileReader (data URL)
+    var triedFileReader = false;
+    function useFileReaderFallback() {
+        if (triedFileReader) {
+            console.warn('[displayTemplatePreview] FileReader fallback already attempted.');
+            alert('Unable to show a preview for this image on this device, but it will still be used.');
+            return;
+        }
+        if (!file) {
+            console.error('[displayTemplatePreview] No file object available for FileReader fallback');
+            alert('Unable to show a preview for this image on this device, but it will still be used.');
+            return;
+        }
+
+        triedFileReader = true;
+        try {
+            var reader = new FileReader();
+            reader.onload = function(evt) {
+                console.log('[displayTemplatePreview] FileReader fallback succeeded');
+                templatePreviewImg.src = evt.target.result;
+            };
+            reader.onerror = function(err) {
+                console.error('[displayTemplatePreview] FileReader fallback error:', err);
+                alert('Unable to show a preview for this image on this device, but it will still be used.');
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            console.error('[displayTemplatePreview] FileReader fallback threw error:', err);
+            alert('Unable to show a preview for this image on this device, but it will still be used.');
+        }
     }
 
     console.log('[displayTemplatePreview] Elements found, setting up preview...');
@@ -460,19 +521,23 @@ function displayTemplatePreview(objectUrl, fileName) {
     if (uploadLabel) uploadLabel.style.display = 'none';
     if (templatePreview) templatePreview.style.display = 'block';
 
-    // Set image src to Object URL (instant, no FileReader needed!)
-    console.log('[displayTemplatePreview] Setting img.src to:', objectUrl);
-    templatePreviewImg.src = objectUrl;
-
-    // Add load and error handlers for debugging
-    templatePreviewImg.onload = function() {
-        console.log('[displayTemplatePreview] Image loaded successfully!');
-    };
-
-    templatePreviewImg.onerror = function(e) {
-        console.error('[displayTemplatePreview] Image failed to load:', e);
-        console.error('[displayTemplatePreview] Failed URL:', objectUrl);
-    };
+    // If we have an object URL, try it first and fall back on error
+    if (objectUrl) {
+        console.log('[displayTemplatePreview] Setting img.src to object URL:', objectUrl);
+        templatePreviewImg.onload = function() {
+            console.log('[displayTemplatePreview] Image loaded successfully!');
+        };
+        templatePreviewImg.onerror = function(e) {
+            console.error('[displayTemplatePreview] Image failed to load from object URL:', e);
+            console.error('[displayTemplatePreview] Failed URL:', objectUrl);
+            // Try data URL fallback for environments that block blob:
+            useFileReaderFallback();
+        };
+        templatePreviewImg.src = objectUrl;
+    } else {
+        console.warn('[displayTemplatePreview] No objectUrl provided, using FileReader fallback directly');
+        useFileReaderFallback();
+    }
 
     console.log('[displayTemplatePreview] Preview setup complete');
 }
@@ -520,7 +585,7 @@ function displayBaseImagePreviews() {
         return;
     }
 
-    // Process each file using URL.createObjectURL
+    // Process each file using URL.createObjectURL with FileReader fallback
     for (var i = 0; i < baseImageFiles.length; i++) {
         (function(index, file) {
             console.log('[displayBaseImagePreviews] Processing file', index + 1, ':', file.name);
@@ -533,6 +598,29 @@ function displayBaseImagePreviews() {
             img.alt = 'Image ' + (index + 1);
             img.setAttribute('data-object-url', 'true');
 
+            var triedFileReader = false;
+            function useFileReaderFallback() {
+                if (triedFileReader) {
+                    console.warn('[displayBaseImagePreviews] FileReader fallback already attempted for index', index);
+                    return;
+                }
+                triedFileReader = true;
+                try {
+                    var reader = new FileReader();
+                    reader.onload = function(evt) {
+                        console.log('[displayBaseImagePreviews] FileReader fallback succeeded for index', index);
+                        img.src = evt.target.result;
+                        img.setAttribute('data-object-url', 'false');
+                    };
+                    reader.onerror = function(err) {
+                        console.error('[displayBaseImagePreviews] FileReader fallback error for index', index, ':', err);
+                    };
+                    reader.readAsDataURL(file);
+                } catch (err) {
+                    console.error('[displayBaseImagePreviews] FileReader fallback threw error for index', index, ':', err);
+                }
+            }
+
             try {
                 var objectUrl = URL.createObjectURL(file);
                 img.src = objectUrl;
@@ -540,19 +628,16 @@ function displayBaseImagePreviews() {
             } catch (e) {
                 console.error('[displayBaseImagePreviews] Failed to create object URL:', e);
                 // Fallback to FileReader
-                var reader = new FileReader();
-                reader.onload = function(evt) {
-                    img.src = evt.target.result;
-                    img.setAttribute('data-object-url', 'false');
-                };
-                reader.readAsDataURL(file);
+                useFileReaderFallback();
             }
 
             img.onload = function() {
                 console.log('[displayBaseImagePreviews] Base image', index + 1, 'loaded successfully');
             };
-            img.onerror = function() {
-                console.error('[displayBaseImagePreviews] Failed to load base image', index + 1);
+            img.onerror = function(e) {
+                console.error('[displayBaseImagePreviews] Failed to load base image', index + 1, 'from object URL:', e);
+                // Try FileReader fallback in environments blocking blob:
+                useFileReaderFallback();
             };
 
             div.appendChild(img);
@@ -677,7 +762,7 @@ function displayProductPreviews(objectUrls) {
         productCountSpan.textContent = objectUrls.length;
     }
 
-    // Create preview for each Object URL
+    // Create preview for each Object URL, with FileReader fallback
     for (var i = 0; i < objectUrls.length; i++) {
         (function(index, result) {
             console.log('[displayProductPreviews] Creating preview', index + 1, 'with URL:', result.url);
@@ -689,9 +774,44 @@ function displayProductPreviews(objectUrls) {
             var img = document.createElement('img');
             img.alt = 'Product ' + (index + 1);
 
+            var triedFileReader = false;
+            function useFileReaderFallback() {
+                if (triedFileReader) {
+                    console.warn('[displayProductPreviews] FileReader fallback already attempted for index', index);
+                    return;
+                }
+                triedFileReader = true;
+
+                // Use the corresponding File object from productFiles if available
+                if (!productFiles || index >= productFiles.length) {
+                    console.error('[displayProductPreviews] No product file available for fallback at index', index);
+                    return;
+                }
+
+                var file = productFiles[index];
+                try {
+                    var reader = new FileReader();
+                    reader.onload = function(evt) {
+                        console.log('[displayProductPreviews] FileReader fallback succeeded for index', index);
+                        img.src = evt.target.result;
+                    };
+                    reader.onerror = function(err) {
+                        console.error('[displayProductPreviews] FileReader fallback error for index', index, ':', err);
+                    };
+                    reader.readAsDataURL(file);
+                } catch (err) {
+                    console.error('[displayProductPreviews] FileReader fallback threw error for index', index, ':', err);
+                }
+            }
+
             // Set image src to Object URL (instant, no FileReader needed!)
-            console.log('[displayProductPreviews] Setting img.src for product', index + 1);
-            img.src = result.url;
+            if (result.url) {
+                console.log('[displayProductPreviews] Setting img.src for product', index + 1);
+                img.src = result.url;
+            } else {
+                console.warn('[displayProductPreviews] No object URL for product index', index, '- using FileReader fallback');
+                useFileReaderFallback();
+            }
 
             // Add load and error handlers for debugging
             img.onload = function() {
@@ -701,6 +821,8 @@ function displayProductPreviews(objectUrls) {
             img.onerror = function(e) {
                 console.error('[displayProductPreviews] Product image', index + 1, 'failed to load:', e);
                 console.error('[displayProductPreviews] Failed URL:', result.url);
+                // Try FileReader fallback for environments that block blob:
+                useFileReaderFallback();
             };
 
             div.appendChild(img);
