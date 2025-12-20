@@ -337,33 +337,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /**
  * Display template preview - Mobile compatible
+ * Uses URL.createObjectURL for faster preview rendering
  */
 function displayTemplatePreview(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const uploadLabel = document.getElementById('templateUploadLabel');
-        const templatePreview = document.getElementById('templatePreview');
-        const templatePreviewImg = document.getElementById('templatePreviewImg');
+    console.log('[displayTemplatePreview] Processing file:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
 
-        if (uploadLabel) uploadLabel.style.display = 'none';
-        if (templatePreview) templatePreview.style.display = 'block';
-        if (templatePreviewImg) {
-            templatePreviewImg.src = e.target.result;
-            // Force image to load on mobile
-            templatePreviewImg.onload = function() {
-                console.log('Template image loaded successfully');
-            };
-            templatePreviewImg.onerror = function() {
-                console.error('Failed to load template image');
-                alert('Failed to display image preview. Please try again.');
-            };
+    var uploadLabel = document.getElementById('templateUploadLabel');
+    var templatePreview = document.getElementById('templatePreview');
+    var templatePreviewImg = document.getElementById('templatePreviewImg');
+
+    if (uploadLabel) uploadLabel.style.display = 'none';
+    if (templatePreview) templatePreview.style.display = 'block';
+
+    if (templatePreviewImg) {
+        // Revoke old object URL if exists
+        if (templatePreviewImg.src && templatePreviewImg.src.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(templatePreviewImg.src);
+            } catch (e) {
+                // Ignore errors
+            }
         }
-    };
-    reader.onerror = function(e) {
-        console.error('FileReader error:', e);
-        alert('Failed to read the image file. Please try again.');
-    };
-    reader.readAsDataURL(file);
+
+        // Use object URL for preview (faster than FileReader)
+        try {
+            var objectUrl = URL.createObjectURL(file);
+            templatePreviewImg.src = objectUrl;
+            console.log('[displayTemplatePreview] Created object URL for preview');
+        } catch (e) {
+            console.error('[displayTemplatePreview] Failed to create object URL:', e);
+            // Fallback to FileReader
+            var reader = new FileReader();
+            reader.onload = function(evt) {
+                templatePreviewImg.src = evt.target.result;
+                console.log('[displayTemplatePreview] Fallback FileReader successful');
+            };
+            reader.onerror = function(err) {
+                console.error('[displayTemplatePreview] FileReader error:', err);
+                alert('Failed to read the image file. Please try again.');
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        templatePreviewImg.onload = function() {
+            console.log('[displayTemplatePreview] Template image loaded successfully');
+        };
+        templatePreviewImg.onerror = function() {
+            console.error('[displayTemplatePreview] Failed to load template image');
+            alert('Failed to display image preview. Please try again.');
+        };
+    }
 }
 
 /**
@@ -382,73 +406,114 @@ function removeTemplate() {
 
 /**
  * Display base image previews (for edit mode with multiple images) - Mobile compatible
+ * Uses URL.createObjectURL for faster preview rendering
  */
 function displayBaseImagePreviews() {
-    const container = document.getElementById('baseImagePreviews');
-    if (!container) return;
+    console.log('[displayBaseImagePreviews] Called with', baseImageFiles.length, 'files');
 
-    container.innerHTML = '';
-
-    if (baseImageFiles.length === 0) {
+    var container = document.getElementById('baseImagePreviews');
+    if (!container) {
+        console.error('[displayBaseImagePreviews] Container not found!');
         return;
     }
 
-    baseImageFiles.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const div = document.createElement('div');
+    // Clear existing previews and revoke old object URLs
+    var oldImages = container.querySelectorAll('img[data-object-url="true"]');
+    for (var k = 0; k < oldImages.length; k++) {
+        try {
+            URL.revokeObjectURL(oldImages[k].src);
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+    container.innerHTML = '';
+
+    if (baseImageFiles.length === 0) {
+        console.log('[displayBaseImagePreviews] No files');
+        return;
+    }
+
+    // Process each file using URL.createObjectURL
+    for (var i = 0; i < baseImageFiles.length; i++) {
+        (function(index, file) {
+            console.log('[displayBaseImagePreviews] Processing file', index + 1, ':', file.name);
+
+            var div = document.createElement('div');
             div.className = 'base-image-preview-item' + (index === primaryImageIndex ? ' primary' : '');
 
-            // Create image element for better mobile compatibility
-            const img = document.createElement('img');
-            img.src = e.target.result;
+            // Create image element using object URL
+            var img = document.createElement('img');
             img.alt = 'Image ' + (index + 1);
+            img.setAttribute('data-object-url', 'true');
+
+            try {
+                var objectUrl = URL.createObjectURL(file);
+                img.src = objectUrl;
+                console.log('[displayBaseImagePreviews] Created object URL for file', index + 1);
+            } catch (e) {
+                console.error('[displayBaseImagePreviews] Failed to create object URL:', e);
+                // Fallback to FileReader
+                var reader = new FileReader();
+                reader.onload = function(evt) {
+                    img.src = evt.target.result;
+                    img.setAttribute('data-object-url', 'false');
+                };
+                reader.readAsDataURL(file);
+            }
+
             img.onload = function() {
-                console.log('Base image ' + (index + 1) + ' loaded successfully');
+                console.log('[displayBaseImagePreviews] Base image', index + 1, 'loaded successfully');
             };
             img.onerror = function() {
-                console.error('Failed to load base image ' + (index + 1));
+                console.error('[displayBaseImagePreviews] Failed to load base image', index + 1);
             };
 
             div.appendChild(img);
 
             // Add star button for primary selection
-            const starDiv = document.createElement('div');
+            var starDiv = document.createElement('div');
             starDiv.className = 'primary-star';
             starDiv.title = 'Set as primary image';
             starDiv.innerHTML = '<i class="fas fa-star"></i>';
-            starDiv.addEventListener('click', function(evt) {
+            starDiv.onclick = function(evt) {
                 evt.preventDefault();
                 evt.stopPropagation();
                 setPrimaryImage(index);
-            });
+            };
+            starDiv.ontouchend = function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                setPrimaryImage(index);
+            };
             div.appendChild(starDiv);
 
             // Add remove button
-            const removeBtn = document.createElement('button');
+            var removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'btn btn-sm btn-danger remove-btn';
             removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-            removeBtn.addEventListener('click', function(evt) {
+            removeBtn.onclick = function(evt) {
                 evt.preventDefault();
                 evt.stopPropagation();
                 removeBaseImage(index);
-            });
+            };
+            removeBtn.ontouchend = function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                removeBaseImage(index);
+            };
             div.appendChild(removeBtn);
 
             // Add label
-            const labelDiv = document.createElement('div');
+            var labelDiv = document.createElement('div');
             labelDiv.className = 'image-label';
             labelDiv.textContent = index === primaryImageIndex ? 'Primary Image' : 'Associated Image';
             div.appendChild(labelDiv);
 
             container.appendChild(div);
-        };
-        reader.onerror = function(e) {
-            console.error('FileReader error for base image:', e);
-        };
-        reader.readAsDataURL(file);
-    });
+            console.log('[displayBaseImagePreviews] Preview added for file', index + 1);
+        })(i, baseImageFiles[i]);
+    }
 }
 
 /**
@@ -483,6 +548,7 @@ function removeBaseImage(index) {
 /**
  * Display product image previews - Mobile compatible
  * Previews are shown in a separate container below the upload zone
+ * Uses URL.createObjectURL for faster preview rendering (no FileReader needed)
  */
 function displayProductPreviews() {
     console.log('[displayProductPreviews] Called with', productFiles.length, 'files');
@@ -500,7 +566,15 @@ function displayProductPreviews() {
         return;
     }
 
-    // Clear existing previews
+    // Clear existing previews and revoke old object URLs
+    var oldImages = container.querySelectorAll('img[data-object-url="true"]');
+    for (var k = 0; k < oldImages.length; k++) {
+        try {
+            URL.revokeObjectURL(oldImages[k].src);
+        } catch (e) {
+            // Ignore errors when revoking
+        }
+    }
     container.innerHTML = '';
 
     // Show/hide the preview container based on whether there are files
@@ -519,67 +593,75 @@ function displayProductPreviews() {
         productCountSpan.textContent = productFiles.length;
     }
 
-    // Process each file
+    // Process each file using URL.createObjectURL (faster than FileReader for previews)
     for (var i = 0; i < productFiles.length; i++) {
         (function(index, file) {
-            console.log('[displayProductPreviews] Processing file', index + 1, ':', file.name);
+            console.log('[displayProductPreviews] Processing file', index + 1, ':', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
 
-            var reader = new FileReader();
+            var div = document.createElement('div');
+            div.className = 'product-preview-item';
+            div.setAttribute('data-index', index);
 
-            reader.onload = function(e) {
-                console.log('[displayProductPreviews] FileReader loaded for file', index + 1);
+            // Create image element using object URL (much faster than FileReader)
+            var img = document.createElement('img');
+            img.alt = 'Product ' + (index + 1);
+            img.setAttribute('data-object-url', 'true');
 
-                var div = document.createElement('div');
-                div.className = 'product-preview-item';
-                div.setAttribute('data-index', index);
-
-                // Create image element
-                var img = document.createElement('img');
-                img.src = e.target.result;
-                img.alt = 'Product ' + (index + 1);
-                img.onload = function() {
-                    console.log('[displayProductPreviews] Image', index + 1, 'rendered successfully');
+            // Create object URL for preview
+            try {
+                var objectUrl = URL.createObjectURL(file);
+                img.src = objectUrl;
+                console.log('[displayProductPreviews] Created object URL for file', index + 1);
+            } catch (e) {
+                console.error('[displayProductPreviews] Failed to create object URL for file', index + 1, ':', e);
+                // Fallback: try FileReader
+                var reader = new FileReader();
+                reader.onload = function(evt) {
+                    img.src = evt.target.result;
+                    img.setAttribute('data-object-url', 'false');
                 };
-                img.onerror = function() {
-                    console.error('[displayProductPreviews] Failed to render image', index + 1);
+                reader.onerror = function() {
+                    console.error('[displayProductPreviews] FileReader also failed for file', index + 1);
                 };
+                reader.readAsDataURL(file);
+            }
 
-                div.appendChild(img);
-
-                // Add remove button
-                var removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'btn btn-sm btn-danger remove-btn';
-                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-                removeBtn.setAttribute('data-index', index);
-
-                // Use closure to capture correct index
-                removeBtn.onclick = function(evt) {
-                    evt.preventDefault();
-                    evt.stopPropagation();
-                    console.log('[displayProductPreviews] Remove clicked for index', index);
-                    removeProductImage(index);
-                };
-
-                // Also add touch support
-                removeBtn.ontouchend = function(evt) {
-                    evt.preventDefault();
-                    evt.stopPropagation();
-                    console.log('[displayProductPreviews] Remove touched for index', index);
-                    removeProductImage(index);
-                };
-
-                div.appendChild(removeBtn);
-                container.appendChild(div);
-
-                console.log('[displayProductPreviews] Preview added for file', index + 1);
+            img.onload = function() {
+                console.log('[displayProductPreviews] Image', index + 1, 'rendered successfully');
+            };
+            img.onerror = function() {
+                console.error('[displayProductPreviews] Failed to render image', index + 1);
             };
 
-            reader.onerror = function(err) {
-                console.error('[displayProductPreviews] FileReader error for file', index + 1, ':', err);
+            div.appendChild(img);
+
+            // Add remove button
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-danger remove-btn';
+            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            removeBtn.setAttribute('data-index', index);
+
+            // Use closure to capture correct index
+            removeBtn.onclick = function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                console.log('[displayProductPreviews] Remove clicked for index', index);
+                removeProductImage(index);
             };
 
-            reader.readAsDataURL(file);
+            // Also add touch support
+            removeBtn.ontouchend = function(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                console.log('[displayProductPreviews] Remove touched for index', index);
+                removeProductImage(index);
+            };
+
+            div.appendChild(removeBtn);
+            container.appendChild(div);
+
+            console.log('[displayProductPreviews] Preview added for file', index + 1);
         })(i, productFiles[i]);
     }
 }
