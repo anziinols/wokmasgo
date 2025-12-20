@@ -496,7 +496,10 @@ function removeProductImage(index) {
  * Generate image using Gemini Nano Banana model
  */
 async function generateImage() {
-    const prompt = document.getElementById('promptInput').value.trim();
+    console.log('[generateImage] Starting image generation');
+
+    var promptInput = document.getElementById('promptInput');
+    var prompt = promptInput ? promptInput.value.trim() : '';
 
     if (!prompt) {
         alert('Please enter a prompt to generate the image.');
@@ -516,6 +519,8 @@ async function generateImage() {
         }
     }
 
+    console.log('[generateImage] Validation passed, selectedType:', selectedType, 'selectedMode:', selectedMode);
+
     // Show loading
     document.getElementById('generateBtn').disabled = true;
     document.getElementById('loadingContainer').style.display = 'block';
@@ -523,28 +528,22 @@ async function generateImage() {
 
     try {
         // Build the complete prompt based on type and inputs
-        let completePrompt = buildCompletePrompt(prompt);
+        var completePrompt = buildCompletePrompt(prompt);
+        console.log('[generateImage] Complete prompt built');
 
         // Call Gemini Nano Banana API
-        const generatedImageUrl = await callGeminiNanoBanana(completePrompt);
+        var generatedImageUrl = await callGeminiNanoBanana(completePrompt);
+        console.log('[generateImage] Image URL received');
 
         // Display result
         document.getElementById('generatedImage').src = generatedImageUrl;
         document.getElementById('resultSection').style.display = 'block';
+        console.log('[generateImage] Image displayed successfully');
 
     } catch (error) {
-        console.error('Error generating image:', error);
-        // Get error message with fallback for mobile browsers
-        let errorMessage = 'Unknown error occurred';
-        if (error) {
-            if (typeof error === 'string') {
-                errorMessage = error;
-            } else if (error.message) {
-                errorMessage = error.message;
-            } else if (error.toString && error.toString() !== '[object Object]') {
-                errorMessage = error.toString();
-            }
-        }
+        console.error('[generateImage] Error:', error);
+        // Use the getErrorMessage helper function
+        var errorMessage = getErrorMessage(error);
         alert('Failed to generate image. Please try again.\n\nError: ' + errorMessage);
     } finally {
         document.getElementById('generateBtn').disabled = false;
@@ -588,132 +587,258 @@ function buildCompletePrompt(userPrompt) {
 }
 
 /**
- * Convert file to base64 data URL
- * Converts AVIF and other formats to PNG for better compatibility
- * Mobile-compatible with proper error handling
+ * Get error message safely (mobile-compatible)
  */
-async function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
+function getErrorMessage(error) {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (error.message) return error.message;
+    if (error.toString && error.toString() !== '[object Object]') return error.toString();
+    return 'Unknown error';
+}
+
+/**
+ * Compress and resize image for mobile compatibility
+ * Reduces image size to prevent memory issues on mobile devices
+ */
+function compressImage(file, maxWidth, maxHeight, quality) {
+    maxWidth = maxWidth || 1920;
+    maxHeight = maxHeight || 1920;
+    quality = quality || 0.85;
+
+    return new Promise(function(resolve, reject) {
+        console.log('[compressImage] Starting compression for:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+
+        var reader = new FileReader();
+
+        reader.onload = function(e) {
+            console.log('[compressImage] FileReader loaded successfully');
+            var img = new Image();
+
+            img.onload = function() {
+                console.log('[compressImage] Image loaded, dimensions:', img.width, 'x', img.height);
+
+                try {
+                    var canvas = document.createElement('canvas');
+                    var width = img.width;
+                    var height = img.height;
+
+                    // Calculate new dimensions
+                    if (width > maxWidth || height > maxHeight) {
+                        var ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                        console.log('[compressImage] Resizing to:', width, 'x', height);
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    var ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        reject(new Error('Failed to get canvas context'));
+                        return;
+                    }
+
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Use JPEG for better compression
+                    var dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    console.log('[compressImage] Compression complete, new size:', Math.round(dataUrl.length / 1024), 'KB');
+                    resolve(dataUrl);
+                } catch (err) {
+                    console.error('[compressImage] Canvas error:', err);
+                    reject(new Error('Image compression failed: ' + getErrorMessage(err)));
+                }
+            };
+
+            img.onerror = function() {
+                console.error('[compressImage] Image load failed');
+                reject(new Error('Failed to load image for compression'));
+            };
+
+            img.src = e.target.result;
+        };
+
+        reader.onerror = function() {
+            console.error('[compressImage] FileReader error');
+            reject(new Error('Failed to read file for compression'));
+        };
+
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Convert file to base64 data URL
+ * Compresses images for mobile compatibility
+ * Uses ES5-compatible syntax for older mobile browsers
+ */
+function fileToBase64(file) {
+    return new Promise(function(resolve, reject) {
+        console.log('[fileToBase64] Processing file:', file ? file.name : 'null');
+
         if (!file) {
             reject(new Error('No file provided for conversion'));
             return;
         }
 
-        // Check if file needs conversion (AVIF, WEBP, HEIC, etc.)
-        const fileType = file.type ? file.type.toLowerCase() : '';
-        const needsConversion = fileType === 'image/avif' || fileType === 'image/webp' ||
-                                fileType === 'image/heic' || fileType === 'image/heif' ||
-                                fileType === '';  // Unknown type on some mobile browsers
+        var fileSizeKB = Math.round(file.size / 1024);
+        console.log('[fileToBase64] File size:', fileSizeKB, 'KB, Type:', file.type);
 
-        if (needsConversion) {
-            // Convert to PNG using canvas
-            const img = new Image();
-            const reader = new FileReader();
+        // Check file size - warn if over 2MB
+        if (file.size > 2 * 1024 * 1024) {
+            console.warn('[fileToBase64] Large file detected (' + fileSizeKB + 'KB), will compress');
+        }
 
-            reader.onload = (e) => {
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
+        // Check if running on mobile
+        var isMobile = isMobileDevice();
+        console.log('[fileToBase64] Is mobile device:', isMobile);
 
-                        // Convert to PNG base64
-                        const pngDataUrl = canvas.toDataURL('image/png');
-                        resolve(pngDataUrl);
-                    } catch (err) {
-                        reject(new Error('Failed to convert image: ' + (err.message || 'Canvas error')));
-                    }
-                };
-                img.onerror = () => reject(new Error('Failed to load image for conversion'));
-                img.src = e.target.result;
-            };
-            reader.onerror = () => reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
-            reader.readAsDataURL(file);
+        // For mobile or large files, always compress
+        var shouldCompress = isMobile || file.size > 1024 * 1024; // Compress if mobile or > 1MB
+
+        if (shouldCompress) {
+            console.log('[fileToBase64] Using compression');
+            // Use compression for mobile
+            compressImage(file, 1600, 1600, 0.8)
+                .then(function(dataUrl) {
+                    console.log('[fileToBase64] Compression successful');
+                    resolve(dataUrl);
+                })
+                .catch(function(err) {
+                    console.error('[fileToBase64] Compression failed, trying direct read:', err);
+                    // Fallback to direct read
+                    directFileRead(file, resolve, reject);
+                });
         } else {
-            // For JPEG, PNG, GIF - use directly
-            const reader = new FileReader();
-            reader.onload = () => {
-                if (reader.result) {
-                    resolve(reader.result);
-                } else {
-                    reject(new Error('Failed to read file data'));
-                }
-            };
-            reader.onerror = () => reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
-            reader.readAsDataURL(file);
+            console.log('[fileToBase64] Using direct read (desktop)');
+            directFileRead(file, resolve, reject);
         }
     });
+}
+
+/**
+ * Direct file read without compression (fallback)
+ */
+function directFileRead(file, resolve, reject) {
+    var reader = new FileReader();
+
+    reader.onload = function() {
+        console.log('[directFileRead] Read successful');
+        if (reader.result) {
+            resolve(reader.result);
+        } else {
+            reject(new Error('Failed to read file data'));
+        }
+    };
+
+    reader.onerror = function() {
+        console.error('[directFileRead] Read failed');
+        reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
+    };
+
+    reader.readAsDataURL(file);
 }
 
 /**
  * Call OpenRouter API with Google Gemini 2.5 Flash Image model (Nano Banana)
  * This model generates actual images, not just descriptions
  * Supports both image generation and image editing
+ * Uses ES5-compatible syntax for mobile browser support
  */
 async function callGeminiNanoBanana(prompt) {
-    console.log('Calling OpenRouter/Gemini Nano Banana API with prompt:', prompt);
-    console.log('Mode:', selectedMode);
-    console.log('Base image files:', baseImageFiles);
-    console.log('Primary image index:', primaryImageIndex);
-    console.log('Template file:', templateFile);
-    console.log('Product files:', productFiles);
+    console.log('[callGeminiNanoBanana] Starting API call');
+    console.log('[callGeminiNanoBanana] Prompt:', prompt);
+    console.log('[callGeminiNanoBanana] Mode:', selectedMode);
+    console.log('[callGeminiNanoBanana] Base image files count:', baseImageFiles.length);
+    console.log('[callGeminiNanoBanana] Product files count:', productFiles.length);
+    console.log('[callGeminiNanoBanana] Template file:', templateFile ? 'yes' : 'no');
 
     try {
         // Get selected aspect ratio from dropdown
-        const aspectRatioSelect = document.getElementById('aspectRatioSelect');
-        let aspectRatio = aspectRatioSelect ? aspectRatioSelect.value : "1:1";
+        var aspectRatioSelect = document.getElementById('aspectRatioSelect');
+        var aspectRatio = aspectRatioSelect ? aspectRatioSelect.value : "1:1";
+        console.log('[callGeminiNanoBanana] Aspect ratio:', aspectRatio);
 
         // Build the message content array
-        let contentParts = [];
+        var contentParts = [];
 
         // For edit mode, include the primary base image first, then associated images
         if (selectedMode === 'edit' && baseImageFiles.length > 0) {
+            console.log('[callGeminiNanoBanana] Processing edit mode images...');
+
             // Add primary image first
-            const primaryImageBase64 = await fileToBase64(baseImageFiles[primaryImageIndex]);
-            contentParts.push({
-                type: "image_url",
-                image_url: {
-                    url: primaryImageBase64
-                }
-            });
+            try {
+                console.log('[callGeminiNanoBanana] Converting primary image...');
+                var primaryImageBase64 = await fileToBase64(baseImageFiles[primaryImageIndex]);
+                console.log('[callGeminiNanoBanana] Primary image converted, size:', Math.round(primaryImageBase64.length / 1024), 'KB');
+                contentParts.push({
+                    type: "image_url",
+                    image_url: {
+                        url: primaryImageBase64
+                    }
+                });
+            } catch (imgError) {
+                console.error('[callGeminiNanoBanana] Primary image conversion failed:', imgError);
+                throw new Error('Failed to process primary image: ' + getErrorMessage(imgError));
+            }
 
             // Add associated images (all images except the primary one)
-            for (let i = 0; i < baseImageFiles.length; i++) {
+            for (var i = 0; i < baseImageFiles.length; i++) {
                 if (i !== primaryImageIndex) {
-                    const associatedImageBase64 = await fileToBase64(baseImageFiles[i]);
-                    contentParts.push({
-                        type: "image_url",
-                        image_url: {
-                            url: associatedImageBase64
-                        }
-                    });
+                    try {
+                        console.log('[callGeminiNanoBanana] Converting associated image', i);
+                        var associatedImageBase64 = await fileToBase64(baseImageFiles[i]);
+                        contentParts.push({
+                            type: "image_url",
+                            image_url: {
+                                url: associatedImageBase64
+                            }
+                        });
+                    } catch (imgError) {
+                        console.error('[callGeminiNanoBanana] Associated image conversion failed:', imgError);
+                        throw new Error('Failed to process associated image: ' + getErrorMessage(imgError));
+                    }
                 }
             }
         }
 
         // For create mode with template, include template image
         if (selectedMode === 'create' && templateFile) {
-            const templateBase64 = await fileToBase64(templateFile);
-            contentParts.push({
-                type: "image_url",
-                image_url: {
-                    url: templateBase64
-                }
-            });
+            try {
+                console.log('[callGeminiNanoBanana] Converting template image...');
+                var templateBase64 = await fileToBase64(templateFile);
+                console.log('[callGeminiNanoBanana] Template converted, size:', Math.round(templateBase64.length / 1024), 'KB');
+                contentParts.push({
+                    type: "image_url",
+                    image_url: {
+                        url: templateBase64
+                    }
+                });
+            } catch (imgError) {
+                console.error('[callGeminiNanoBanana] Template conversion failed:', imgError);
+                throw new Error('Failed to process template image: ' + getErrorMessage(imgError));
+            }
         }
 
         // Add product images if any (for create mode)
         if (selectedMode === 'create' && productFiles.length > 0) {
-            for (const productFile of productFiles) {
-                const productBase64 = await fileToBase64(productFile);
-                contentParts.push({
-                    type: "image_url",
-                    image_url: {
-                        url: productBase64
-                    }
-                });
+            console.log('[callGeminiNanoBanana] Processing', productFiles.length, 'product images...');
+            for (var j = 0; j < productFiles.length; j++) {
+                try {
+                    console.log('[callGeminiNanoBanana] Converting product image', j + 1);
+                    var productBase64 = await fileToBase64(productFiles[j]);
+                    contentParts.push({
+                        type: "image_url",
+                        image_url: {
+                            url: productBase64
+                        }
+                    });
+                } catch (imgError) {
+                    console.error('[callGeminiNanoBanana] Product image conversion failed:', imgError);
+                    throw new Error('Failed to process product image ' + (j + 1) + ': ' + getErrorMessage(imgError));
+                }
             }
         }
 
@@ -723,8 +848,10 @@ async function callGeminiNanoBanana(prompt) {
             text: prompt
         });
 
+        console.log('[callGeminiNanoBanana] Content parts ready:', contentParts.length, 'parts');
+
         // Prepare the API request body
-        const requestBody = {
+        var requestBody = {
             model: "google/gemini-2.5-flash-image",
             messages: [
                 {
@@ -732,18 +859,30 @@ async function callGeminiNanoBanana(prompt) {
                     content: contentParts
                 }
             ],
-            modalities: ["image", "text"], // Request both image and text output
+            modalities: ["image", "text"],
             image_config: {
                 aspect_ratio: aspectRatio
             }
         };
 
         // Get CSRF token
-        const csrfTokenName = '<?= csrf_token() ?>';
-        const csrfToken = document.querySelector('input[name="' + csrfTokenName + '"]').value;
+        var csrfTokenName = '<?= csrf_token() ?>';
+        var csrfInput = document.querySelector('input[name="' + csrfTokenName + '"]');
+        if (!csrfInput) {
+            throw new Error('CSRF token input not found');
+        }
+        var csrfToken = csrfInput.value;
 
-        // Make API call to backend endpoint (keeps API key secure)
-        let response;
+        // Build request body with CSRF (ES5 compatible - no spread operator)
+        var bodyWithCsrf = JSON.parse(JSON.stringify(requestBody));
+        bodyWithCsrf[csrfTokenName] = csrfToken;
+
+        console.log('[callGeminiNanoBanana] Making API request...');
+        var requestBodyString = JSON.stringify(bodyWithCsrf);
+        console.log('[callGeminiNanoBanana] Request body size:', Math.round(requestBodyString.length / 1024), 'KB');
+
+        // Make API call to backend endpoint
+        var response;
         try {
             response = await fetch('<?= base_url("image-creator/generate") ?>', {
                 method: 'POST',
@@ -751,67 +890,84 @@ async function callGeminiNanoBanana(prompt) {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({
-                    ...requestBody,
-                    [csrfTokenName]: csrfToken
-                })
+                body: requestBodyString
             });
+            console.log('[callGeminiNanoBanana] Fetch completed, status:', response.status);
         } catch (networkError) {
-            console.error('Network error:', networkError);
+            console.error('[callGeminiNanoBanana] Network error:', networkError);
             throw new Error('Network error: Please check your internet connection and try again.');
         }
 
-        let responseData;
+        // Parse response
+        var responseData;
         try {
-            responseData = await response.json();
+            var responseText = await response.text();
+            console.log('[callGeminiNanoBanana] Response text length:', responseText.length);
+            responseData = JSON.parse(responseText);
         } catch (parseError) {
-            console.error('Response parse error:', parseError);
+            console.error('[callGeminiNanoBanana] Response parse error:', parseError);
             throw new Error('Server response error. Please try again.');
         }
 
         // Update CSRF token
         if (responseData && responseData.csrf_token) {
-            const csrfInput = document.querySelector('input[name="' + csrfTokenName + '"]');
-            if (csrfInput) {
-                csrfInput.value = responseData.csrf_token;
+            var newCsrfInput = document.querySelector('input[name="' + csrfTokenName + '"]');
+            if (newCsrfInput) {
+                newCsrfInput.value = responseData.csrf_token;
             }
         }
 
+        // Check for success
         if (!responseData || !responseData.success) {
-            throw new Error(responseData?.error || 'API request failed');
+            var errorMsg = 'API request failed';
+            if (responseData && responseData.error) {
+                errorMsg = responseData.error;
+            }
+            console.error('[callGeminiNanoBanana] API error:', errorMsg);
+            throw new Error(errorMsg);
         }
 
-        const data = responseData.data;
-        console.log('API Response:', data);
+        var data = responseData.data;
+        console.log('[callGeminiNanoBanana] API Response received');
 
         // Extract the generated image from the response
         if (data && data.choices && data.choices[0] && data.choices[0].message) {
-            const message = data.choices[0].message;
+            var message = data.choices[0].message;
 
             // Check if images were generated
             if (message.images && message.images.length > 0) {
                 // Return the first generated image (base64 data URL)
-                const imageUrl = message.images[0].image_url?.url || message.images[0].url;
+                // ES5 compatible - no optional chaining
+                var imageData = message.images[0];
+                var imageUrl = null;
+                if (imageData.image_url && imageData.image_url.url) {
+                    imageUrl = imageData.image_url.url;
+                } else if (imageData.url) {
+                    imageUrl = imageData.url;
+                }
+
                 if (!imageUrl) {
                     throw new Error('Image URL not found in response');
                 }
-                console.log('Generated image received successfully');
+                console.log('[callGeminiNanoBanana] Generated image received successfully');
                 return imageUrl;
             }
             // If no images but there's text content
             else if (message.content) {
-                console.log('Text response:', message.content);
-                throw new Error('Model returned text instead of image. Response: ' + message.content.substring(0, 100));
+                console.log('[callGeminiNanoBanana] Text response:', message.content);
+                var truncatedContent = message.content.length > 100 ? message.content.substring(0, 100) : message.content;
+                throw new Error('Model returned text instead of image: ' + truncatedContent);
             }
             else {
                 throw new Error('No image generated in the response');
             }
         } else {
+            console.error('[callGeminiNanoBanana] Unexpected response format:', data);
             throw new Error('Unexpected API response format');
         }
 
     } catch (error) {
-        console.error('Error calling OpenRouter API:', error);
+        console.error('[callGeminiNanoBanana] Error:', error);
         // Ensure we always throw an error with a message
         if (error && error.message) {
             throw error;
