@@ -733,18 +733,53 @@ function compressImage(file, maxWidth, maxHeight, quality) {
     quality = quality || 0.85;
 
     return new Promise(function(resolve, reject) {
-        console.log('[compressImage] Starting compression for:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+        var fileName = file ? file.name : 'unknown';
+        var fileSize = file ? Math.round(file.size / 1024) : 0;
+        var fileType = file ? (file.type || 'unknown') : 'unknown';
 
-        var reader = new FileReader();
+        console.log('[compressImage] Starting compression');
+        console.log('[compressImage] File name:', fileName);
+        console.log('[compressImage] File size:', fileSize, 'KB');
+        console.log('[compressImage] File type:', fileType);
 
-        reader.onload = function(e) {
-            console.log('[compressImage] FileReader loaded successfully');
+        if (!file) {
+            reject(new Error('No file provided for compression'));
+            return;
+        }
+
+        // Check if file type is supported
+        var supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+        var isHeic = fileType === 'image/heic' || fileType === 'image/heif' ||
+                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
+
+        if (isHeic) {
+            console.warn('[compressImage] HEIC/HEIF format detected - not supported for compression, using direct read');
+            reject(new Error('HEIC format requires direct read'));
+            return;
+        }
+
+        // Use createObjectURL for faster initial load (works better on mobile)
+        var objectUrl = null;
+        try {
+            objectUrl = URL.createObjectURL(file);
+            console.log('[compressImage] Created object URL');
+        } catch (urlError) {
+            console.error('[compressImage] Failed to create object URL:', urlError);
+            // Fall back to FileReader approach
+            objectUrl = null;
+        }
+
+        if (objectUrl) {
+            // Use object URL approach (faster and more memory efficient)
             var img = new Image();
 
             img.onload = function() {
-                console.log('[compressImage] Image loaded, dimensions:', img.width, 'x', img.height);
+                console.log('[compressImage] Image loaded via objectURL, dimensions:', img.width, 'x', img.height);
 
                 try {
+                    // Release object URL after image loads
+                    URL.revokeObjectURL(objectUrl);
+
                     var canvas = document.createElement('canvas');
                     var width = img.width;
                     var height = img.height;
@@ -770,7 +805,13 @@ function compressImage(file, maxWidth, maxHeight, quality) {
 
                     // Use JPEG for better compression
                     var dataUrl = canvas.toDataURL('image/jpeg', quality);
-                    console.log('[compressImage] Compression complete, new size:', Math.round(dataUrl.length / 1024), 'KB');
+                    var compressedSize = Math.round(dataUrl.length / 1024);
+                    console.log('[compressImage] Compression complete, new size:', compressedSize, 'KB');
+
+                    // Clear canvas to free memory
+                    canvas.width = 0;
+                    canvas.height = 0;
+
                     resolve(dataUrl);
                 } catch (err) {
                     console.error('[compressImage] Canvas error:', err);
@@ -778,20 +819,85 @@ function compressImage(file, maxWidth, maxHeight, quality) {
                 }
             };
 
-            img.onerror = function() {
-                console.error('[compressImage] Image load failed');
-                reject(new Error('Failed to load image for compression'));
+            img.onerror = function(e) {
+                console.error('[compressImage] Image load failed via objectURL');
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error('Failed to load image: ' + fileName));
             };
 
-            img.src = e.target.result;
-        };
+            img.src = objectUrl;
+        } else {
+            // Fallback to FileReader (slower but more compatible)
+            console.log('[compressImage] Using FileReader fallback');
+            var reader = new FileReader();
 
-        reader.onerror = function() {
-            console.error('[compressImage] FileReader error');
-            reject(new Error('Failed to read file for compression'));
-        };
+            reader.onload = function(e) {
+                console.log('[compressImage] FileReader loaded successfully');
+                var img = new Image();
 
-        reader.readAsDataURL(file);
+                img.onload = function() {
+                    console.log('[compressImage] Image loaded via FileReader, dimensions:', img.width, 'x', img.height);
+
+                    try {
+                        var canvas = document.createElement('canvas');
+                        var width = img.width;
+                        var height = img.height;
+
+                        if (width > maxWidth || height > maxHeight) {
+                            var ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width = Math.round(width * ratio);
+                            height = Math.round(height * ratio);
+                            console.log('[compressImage] Resizing to:', width, 'x', height);
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        var ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            reject(new Error('Failed to get canvas context'));
+                            return;
+                        }
+
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+                        console.log('[compressImage] Compression complete, new size:', Math.round(dataUrl.length / 1024), 'KB');
+
+                        canvas.width = 0;
+                        canvas.height = 0;
+
+                        resolve(dataUrl);
+                    } catch (err) {
+                        console.error('[compressImage] Canvas error:', err);
+                        reject(new Error('Image compression failed: ' + getErrorMessage(err)));
+                    }
+                };
+
+                img.onerror = function() {
+                    console.error('[compressImage] Image load failed via FileReader');
+                    reject(new Error('Failed to load image: ' + fileName));
+                };
+
+                img.src = e.target.result;
+            };
+
+            reader.onerror = function(e) {
+                var errorMsg = 'FileReader error';
+                if (reader.error) {
+                    errorMsg = reader.error.message || reader.error.name || 'Unknown FileReader error';
+                }
+                console.error('[compressImage] FileReader error:', errorMsg);
+                reject(new Error('Failed to read file: ' + fileName + ' (' + errorMsg + ')'));
+            };
+
+            reader.onabort = function() {
+                console.error('[compressImage] FileReader aborted');
+                reject(new Error('File reading was aborted: ' + fileName));
+            };
+
+            reader.readAsDataURL(file);
+        }
     });
 }
 
@@ -802,18 +908,32 @@ function compressImage(file, maxWidth, maxHeight, quality) {
  */
 function fileToBase64(file) {
     return new Promise(function(resolve, reject) {
-        console.log('[fileToBase64] Processing file:', file ? file.name : 'null');
+        var fileName = file ? file.name : 'null';
+        var fileSize = file ? file.size : 0;
+        var fileSizeKB = Math.round(fileSize / 1024);
+        var fileType = file ? (file.type || 'unknown') : 'unknown';
+
+        console.log('[fileToBase64] ========================================');
+        console.log('[fileToBase64] Processing file:', fileName);
+        console.log('[fileToBase64] File size:', fileSizeKB, 'KB');
+        console.log('[fileToBase64] File type:', fileType);
+        console.log('[fileToBase64] File object valid:', !!file);
 
         if (!file) {
+            console.error('[fileToBase64] No file provided!');
             reject(new Error('No file provided for conversion'));
             return;
         }
 
-        var fileSizeKB = Math.round(file.size / 1024);
-        console.log('[fileToBase64] File size:', fileSizeKB, 'KB, Type:', file.type);
+        // Check if file size is 0 (corrupted or invalid reference)
+        if (fileSize === 0) {
+            console.error('[fileToBase64] File size is 0 - file may be corrupted or reference invalid');
+            reject(new Error('File appears to be empty or corrupted: ' + fileName));
+            return;
+        }
 
         // Check file size - warn if over 2MB
-        if (file.size > 2 * 1024 * 1024) {
+        if (fileSize > 2 * 1024 * 1024) {
             console.warn('[fileToBase64] Large file detected (' + fileSizeKB + 'KB), will compress');
         }
 
@@ -821,24 +941,34 @@ function fileToBase64(file) {
         var isMobile = isMobileDevice();
         console.log('[fileToBase64] Is mobile device:', isMobile);
 
-        // For mobile or large files, always compress
-        var shouldCompress = isMobile || file.size > 1024 * 1024; // Compress if mobile or > 1MB
+        // Check if file is HEIC/HEIF (iOS photos)
+        var isHeic = fileType === 'image/heic' || fileType === 'image/heif' ||
+                     fileName.toLowerCase().endsWith('.heic') || fileName.toLowerCase().endsWith('.heif');
+
+        if (isHeic) {
+            console.log('[fileToBase64] HEIC/HEIF format detected - using direct read');
+            // HEIC files can't be compressed via canvas, use direct read
+            directFileRead(file, resolve, reject);
+            return;
+        }
+
+        // For mobile or large files, try compression first
+        var shouldCompress = isMobile || fileSize > 1024 * 1024; // Compress if mobile or > 1MB
 
         if (shouldCompress) {
-            console.log('[fileToBase64] Using compression');
-            // Use compression for mobile
+            console.log('[fileToBase64] Attempting compression...');
             compressImage(file, 1600, 1600, 0.8)
                 .then(function(dataUrl) {
-                    console.log('[fileToBase64] Compression successful');
+                    console.log('[fileToBase64] Compression successful, result size:', Math.round(dataUrl.length / 1024), 'KB');
                     resolve(dataUrl);
                 })
                 .catch(function(err) {
-                    console.error('[fileToBase64] Compression failed, trying direct read:', err);
-                    // Fallback to direct read
+                    console.warn('[fileToBase64] Compression failed:', getErrorMessage(err));
+                    console.log('[fileToBase64] Falling back to direct read...');
                     directFileRead(file, resolve, reject);
                 });
         } else {
-            console.log('[fileToBase64] Using direct read (desktop)');
+            console.log('[fileToBase64] Using direct read (desktop/small file)');
             directFileRead(file, resolve, reject);
         }
     });
@@ -846,25 +976,123 @@ function fileToBase64(file) {
 
 /**
  * Direct file read without compression (fallback)
+ * Enhanced error handling for mobile browsers
  */
 function directFileRead(file, resolve, reject) {
+    var fileName = file ? file.name : 'unknown';
+    var fileSize = file ? file.size : 0;
+
+    console.log('[directFileRead] Starting direct read for:', fileName);
+    console.log('[directFileRead] File size:', Math.round(fileSize / 1024), 'KB');
+
+    if (!file || fileSize === 0) {
+        console.error('[directFileRead] Invalid file or zero size');
+        reject(new Error('Invalid file: ' + fileName));
+        return;
+    }
+
+    // Try using object URL first (faster and more memory efficient on mobile)
+    var objectUrl = null;
+    try {
+        objectUrl = URL.createObjectURL(file);
+        console.log('[directFileRead] Created object URL for faster loading');
+    } catch (e) {
+        console.warn('[directFileRead] Could not create object URL:', e);
+        objectUrl = null;
+    }
+
+    if (objectUrl) {
+        // Use object URL with Image to verify the file is valid, then read
+        var testImg = new Image();
+        testImg.onload = function() {
+            console.log('[directFileRead] File validated via Image, now reading as base64...');
+            URL.revokeObjectURL(objectUrl);
+
+            // Now do the actual FileReader
+            var reader = new FileReader();
+
+            reader.onload = function() {
+                console.log('[directFileRead] Read successful, size:', Math.round(reader.result.length / 1024), 'KB');
+                if (reader.result) {
+                    resolve(reader.result);
+                } else {
+                    console.error('[directFileRead] Read returned empty result');
+                    reject(new Error('Failed to read file data: ' + fileName));
+                }
+            };
+
+            reader.onerror = function(e) {
+                var errorMsg = 'Unknown error';
+                if (reader.error) {
+                    errorMsg = reader.error.message || reader.error.name || 'FileReader error';
+                }
+                console.error('[directFileRead] FileReader error:', errorMsg);
+                reject(new Error('Failed to read file ' + fileName + ': ' + errorMsg));
+            };
+
+            reader.onabort = function() {
+                console.error('[directFileRead] FileReader aborted');
+                reject(new Error('File reading was aborted: ' + fileName));
+            };
+
+            reader.readAsDataURL(file);
+        };
+
+        testImg.onerror = function() {
+            console.warn('[directFileRead] Image validation failed, trying direct FileReader');
+            URL.revokeObjectURL(objectUrl);
+
+            // Fallback to direct FileReader without validation
+            readFileDirectly(file, resolve, reject, fileName);
+        };
+
+        testImg.src = objectUrl;
+    } else {
+        // Direct FileReader fallback
+        readFileDirectly(file, resolve, reject, fileName);
+    }
+}
+
+/**
+ * Simple direct FileReader (innermost fallback)
+ */
+function readFileDirectly(file, resolve, reject, fileName) {
+    console.log('[readFileDirectly] Using simple FileReader for:', fileName);
+
     var reader = new FileReader();
 
     reader.onload = function() {
-        console.log('[directFileRead] Read successful');
+        console.log('[readFileDirectly] Read successful');
         if (reader.result) {
+            console.log('[readFileDirectly] Result size:', Math.round(reader.result.length / 1024), 'KB');
             resolve(reader.result);
         } else {
-            reject(new Error('Failed to read file data'));
+            console.error('[readFileDirectly] Empty result');
+            reject(new Error('Failed to read file data: ' + fileName));
         }
     };
 
-    reader.onerror = function() {
-        console.error('[directFileRead] Read failed');
-        reject(new Error('Failed to read file: ' + (file.name || 'unknown')));
+    reader.onerror = function(e) {
+        var errorMsg = 'Unknown error';
+        if (reader.error) {
+            errorMsg = reader.error.message || reader.error.name || 'FileReader error';
+        }
+        console.error('[readFileDirectly] FileReader error:', errorMsg);
+        console.error('[readFileDirectly] Error object:', reader.error);
+        reject(new Error('Failed to read file ' + fileName + ': ' + errorMsg));
     };
 
-    reader.readAsDataURL(file);
+    reader.onabort = function() {
+        console.error('[readFileDirectly] Aborted');
+        reject(new Error('File reading was aborted: ' + fileName));
+    };
+
+    try {
+        reader.readAsDataURL(file);
+    } catch (e) {
+        console.error('[readFileDirectly] Exception calling readAsDataURL:', e);
+        reject(new Error('Exception reading file ' + fileName + ': ' + getErrorMessage(e)));
+    }
 }
 
 /**
