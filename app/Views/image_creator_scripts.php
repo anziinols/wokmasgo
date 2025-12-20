@@ -547,19 +547,22 @@ function removeBaseImage(index) {
 
 /**
  * Display product image previews - Mobile compatible
- * Previews are shown in a separate container below the upload zone
+ * Previews are shown INSIDE the upload area (inline)
  * Uses URL.createObjectURL for faster preview rendering (no FileReader needed)
  */
 function displayProductPreviews() {
     console.log('[displayProductPreviews] Called with', productFiles.length, 'files');
 
     var container = document.getElementById('productPreviews');
-    var previewsContainer = document.getElementById('productPreviewsContainer');
+    var uploadArea = document.getElementById('productUploadArea');
+    var placeholder = document.getElementById('productUploadPlaceholder');
+    var previewsInline = document.getElementById('productPreviewsInline');
     var productCountSpan = document.getElementById('productCount');
 
     console.log('[displayProductPreviews] Container found:', !!container);
-    console.log('[displayProductPreviews] PreviewsContainer found:', !!previewsContainer);
-    console.log('[displayProductPreviews] ProductCountSpan found:', !!productCountSpan);
+    console.log('[displayProductPreviews] UploadArea found:', !!uploadArea);
+    console.log('[displayProductPreviews] Placeholder found:', !!placeholder);
+    console.log('[displayProductPreviews] PreviewsInline found:', !!previewsInline);
 
     if (!container) {
         console.error('[displayProductPreviews] Container #productPreviews not found!');
@@ -577,21 +580,30 @@ function displayProductPreviews() {
     }
     container.innerHTML = '';
 
-    // Show/hide the preview container based on whether there are files
+    // Show/hide elements based on whether there are files
     if (productFiles.length === 0) {
-        console.log('[displayProductPreviews] No files, hiding container');
-        if (previewsContainer) previewsContainer.style.display = 'none';
+        console.log('[displayProductPreviews] No files, showing placeholder');
+        if (placeholder) placeholder.style.display = 'flex';
+        if (previewsInline) previewsInline.style.display = 'none';
+        if (uploadArea) uploadArea.classList.remove('has-images');
+        if (productCountSpan) {
+            productCountSpan.style.display = 'none';
+            productCountSpan.textContent = '0';
+        }
         return;
     }
 
-    // Show the preview container and update count
-    if (previewsContainer) {
-        previewsContainer.style.display = 'block';
-        console.log('[displayProductPreviews] Container displayed');
-    }
+    // Hide placeholder, show inline previews
+    if (placeholder) placeholder.style.display = 'none';
+    if (previewsInline) previewsInline.style.display = 'flex';
+    if (uploadArea) uploadArea.classList.add('has-images');
+
+    // Update count badge
     if (productCountSpan) {
+        productCountSpan.style.display = 'inline-block';
         productCountSpan.textContent = productFiles.length;
     }
+    console.log('[displayProductPreviews] Showing', productFiles.length, 'preview(s) inline');
 
     // Process each file using URL.createObjectURL (faster than FileReader for previews)
     for (var i = 0; i < productFiles.length; i++) {

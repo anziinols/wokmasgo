@@ -126,21 +126,25 @@
                     <label class="form-label fw-bold">
                         <i class="fas fa-images me-2"></i>
                         Upload Product Images (Multiple)
+                        <span id="productCount" class="badge bg-primary ms-2" style="display: none;">0</span>
                     </label>
-                    <div class="upload-area" id="productUploadArea">
+                    <div class="upload-area product-upload-area" id="productUploadArea">
                         <input type="file" id="productImagesInput" accept="image/*" multiple class="mobile-file-input">
-                        <label for="productImagesInput" class="upload-placeholder upload-label">
+                        <!-- Upload placeholder - shown when no images -->
+                        <label for="productImagesInput" class="upload-placeholder upload-label" id="productUploadPlaceholder">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
                             <p class="mb-0">Tap to upload product images or drag and drop</p>
                             <small class="text-muted">Supports: JPG, PNG, GIF, WEBP, AVIF (Max 5MB each)</small>
                         </label>
-                    </div>
-                    <!-- Separate container for product image previews -->
-                    <div class="product-previews-container" id="productPreviewsContainer" style="display: none;">
-                        <div class="product-previews-header">
-                            <span class="fw-bold"><i class="fas fa-th me-2"></i>Uploaded Products (<span id="productCount">0</span>)</span>
+                        <!-- Product previews grid - shown when images are uploaded -->
+                        <div class="product-previews-inline" id="productPreviewsInline" style="display: none;">
+                            <div class="product-previews-grid" id="productPreviews"></div>
+                            <!-- Add more images button -->
+                            <label for="productImagesInput" class="add-more-images-btn" id="addMoreImagesBtn">
+                                <i class="fas fa-plus"></i>
+                                <span>Add More</span>
+                            </label>
                         </div>
-                        <div class="product-previews" id="productPreviews"></div>
                     </div>
                 </div>
 
