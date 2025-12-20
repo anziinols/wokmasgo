@@ -29,6 +29,7 @@
 let selectedType = '';
 let selectedMode = ''; // 'create' or 'edit' for flyers
 let templateFile = null;
+let templateDataUrl = null; // Store base64 data URL to avoid stale File reference on mobile
 let productFiles = [];
 let baseImageFiles = []; // For image editing - multiple images
 let primaryImageIndex = 0; // Index of the primary image to edit
@@ -348,6 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create preview (handles HEIC conversion if needed)
             createPreviewUrl(file).then(function(result) {
                 templateFile = result.file;
+                templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
                 displayTemplatePreview(result.dataUrl, result.file.name);
             }).catch(function(err) {
                 console.error('[Template Upload] Error:', err);
@@ -392,6 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create preview (handles HEIC conversion if needed)
             createPreviewUrl(file).then(function(result) {
                 templateFile = result.file;
+                templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
                 displayTemplatePreview(result.dataUrl, result.file.name);
             }).catch(function(err) {
                 console.error('[Template Drop] Error:', err);
@@ -606,6 +609,7 @@ function displayTemplatePreview(previewUrl, fileName) {
  */
 function removeTemplate() {
     templateFile = null;
+    templateDataUrl = null; // Clear stored data URL
     var templateInput = document.getElementById('templateInput');
     var uploadLabel = document.getElementById('templateUploadLabel');
     var templatePreview = document.getElementById('templatePreview');
@@ -1279,81 +1283,55 @@ async function callGeminiNanoBanana(prompt) {
         // Build the message content array
         var contentParts = [];
 
-        // For edit mode, include the primary base image first, then associated images
-        if (selectedMode === 'edit' && baseImageFiles.length > 0) {
-            console.log('[callGeminiNanoBanana] Processing edit mode images...');
+        // For edit mode, include the primary base image first, then associated images using stored data URLs
+        if (selectedMode === 'edit' && baseImagePreviews.length > 0) {
+            console.log('[callGeminiNanoBanana] Processing edit mode images using stored data URLs...');
 
             // Add primary image first
-            try {
-                console.log('[callGeminiNanoBanana] Converting primary image...');
-                var primaryImageBase64 = await fileToBase64(baseImageFiles[primaryImageIndex]);
-                console.log('[callGeminiNanoBanana] Primary image converted, size:', Math.round(primaryImageBase64.length / 1024), 'KB');
-                contentParts.push({
-                    type: "image_url",
-                    image_url: {
-                        url: primaryImageBase64
-                    }
-                });
-            } catch (imgError) {
-                console.error('[callGeminiNanoBanana] Primary image conversion failed:', imgError);
-                throw new Error('Failed to process primary image: ' + getErrorMessage(imgError));
-            }
+            console.log('[callGeminiNanoBanana] Using stored primary image, size:', Math.round(baseImagePreviews[primaryImageIndex].dataUrl.length / 1024), 'KB');
+            contentParts.push({
+                type: "image_url",
+                image_url: {
+                    url: baseImagePreviews[primaryImageIndex].dataUrl
+                }
+            });
 
             // Add associated images (all images except the primary one)
-            for (var i = 0; i < baseImageFiles.length; i++) {
+            for (var i = 0; i < baseImagePreviews.length; i++) {
                 if (i !== primaryImageIndex) {
-                    try {
-                        console.log('[callGeminiNanoBanana] Converting associated image', i);
-                        var associatedImageBase64 = await fileToBase64(baseImageFiles[i]);
-                        contentParts.push({
-                            type: "image_url",
-                            image_url: {
-                                url: associatedImageBase64
-                            }
-                        });
-                    } catch (imgError) {
-                        console.error('[callGeminiNanoBanana] Associated image conversion failed:', imgError);
-                        throw new Error('Failed to process associated image: ' + getErrorMessage(imgError));
-                    }
-                }
-            }
-        }
-
-        // For create mode with template, include template image
-        if (selectedMode === 'create' && templateFile) {
-            try {
-                console.log('[callGeminiNanoBanana] Converting template image...');
-                var templateBase64 = await fileToBase64(templateFile);
-                console.log('[callGeminiNanoBanana] Template converted, size:', Math.round(templateBase64.length / 1024), 'KB');
-                contentParts.push({
-                    type: "image_url",
-                    image_url: {
-                        url: templateBase64
-                    }
-                });
-            } catch (imgError) {
-                console.error('[callGeminiNanoBanana] Template conversion failed:', imgError);
-                throw new Error('Failed to process template image: ' + getErrorMessage(imgError));
-            }
-        }
-
-        // Add product images if any (for create mode)
-        if (selectedMode === 'create' && productFiles.length > 0) {
-            console.log('[callGeminiNanoBanana] Processing', productFiles.length, 'product images...');
-            for (var j = 0; j < productFiles.length; j++) {
-                try {
-                    console.log('[callGeminiNanoBanana] Converting product image', j + 1);
-                    var productBase64 = await fileToBase64(productFiles[j]);
+                    console.log('[callGeminiNanoBanana] Using stored associated image', i);
                     contentParts.push({
                         type: "image_url",
                         image_url: {
-                            url: productBase64
+                            url: baseImagePreviews[i].dataUrl
                         }
                     });
-                } catch (imgError) {
-                    console.error('[callGeminiNanoBanana] Product image conversion failed:', imgError);
-                    throw new Error('Failed to process product image ' + (j + 1) + ': ' + getErrorMessage(imgError));
                 }
+            }
+        }
+
+        // For create mode with template, include template image using stored data URL
+        if (selectedMode === 'create' && templateDataUrl) {
+            console.log('[callGeminiNanoBanana] Using stored template data URL, size:', Math.round(templateDataUrl.length / 1024), 'KB');
+            contentParts.push({
+                type: "image_url",
+                image_url: {
+                    url: templateDataUrl
+                }
+            });
+        }
+
+        // Add product images if any (for create mode) using stored data URLs
+        if (selectedMode === 'create' && productPreviews.length > 0) {
+            console.log('[callGeminiNanoBanana] Processing', productPreviews.length, 'product images...');
+            for (var j = 0; j < productPreviews.length; j++) {
+                console.log('[callGeminiNanoBanana] Using stored product image', j + 1);
+                contentParts.push({
+                    type: "image_url",
+                    image_url: {
+                        url: productPreviews[j].dataUrl
+                    }
+                });
             }
         }
 
@@ -1519,8 +1497,11 @@ function resetForm() {
     // Clear inputs
     document.getElementById('promptInput').value = '';
     templateFile = null;
+    templateDataUrl = null;
     productFiles = [];
+    productPreviews = [];
     baseImageFiles = [];
+    baseImagePreviews = [];
     primaryImageIndex = 0;
 
     // Reset file inputs
