@@ -219,6 +219,44 @@ function hideTemplateLoading() {
 }
 
 /**
+ * Handle base image read results (called after all files are read)
+ */
+function handleBaseImageReadResults(results) {
+    console.log('[handleBaseImageReadResults] Processing', results.length, 'results');
+
+    var validResults = [];
+    var invalidResults = [];
+
+    results.forEach(function(result) {
+        if (result.valid && result.dataUrl) {
+            validResults.push(result);
+            baseImageFiles.push(result.file);
+            baseImagePreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        } else {
+            invalidResults.push(result);
+        }
+    });
+
+    // Display valid images
+    if (validResults.length > 0) {
+        displayBaseImagePreviews();
+    }
+
+    // Show summary
+    if (invalidResults.length > 0) {
+        var msg = 'Processed ' + validResults.length + ' of ' + results.length + ' images.\n\n';
+        msg += 'Skipped files:\n';
+        invalidResults.forEach(function(r) {
+            var reason = r.error ? 'Read error' : 'Invalid type or too large';
+            msg += '- ' + r.file.name + ' (' + reason + ')\n';
+        });
+        alert(msg);
+    } else {
+        console.log('[handleBaseImageReadResults] All', validResults.length, 'images processed successfully');
+    }
+}
+
+/**
  * Handle product image read results (called after all files are read)
  */
 function handleProductReadResults(results) {
@@ -692,25 +730,63 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
-            for (var i = 0; i < files.length; i++) {
-                var file = files[i];
-                if (!isValidImageFile(file)) {
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC/HEIF');
-                    continue;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB: ' + file.name);
-                    continue;
-                }
-                validFiles.push(file);
-            }
+            console.log('[Base Images] Files selected:', files.length);
 
-            if (validFiles.length === 0) return;
+            // ULTRA-CRITICAL: Start reading ALL files IMMEDIATELY
+            var readResults = [];
+            var readersCompleted = 0;
 
-            // Process files and create previews
-            processBaseImageFiles(validFiles);
+            files.forEach(function(file, index) {
+                console.log('[Base Images] Starting read for:', file.name);
+
+                var reader = new FileReader();
+
+                reader.onload = function(readerEvent) {
+                    var dataUrl = readerEvent.target.result;
+                    console.log('[Base Images] Read successful:', file.name);
+
+                    // Validate AFTER reading
+                    var isValid = isValidImageFile(file);
+                    var isSizeOk = file.size <= 5 * 1024 * 1024;
+
+                    if (!isValid) {
+                        console.warn('[Base Images] Invalid type:', file.name);
+                    }
+                    if (!isSizeOk) {
+                        console.warn('[Base Images] Too large:', file.name);
+                    }
+
+                    readResults.push({
+                        file: file,
+                        dataUrl: dataUrl,
+                        valid: isValid && isSizeOk,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        handleBaseImageReadResults(readResults);
+                    }
+                };
+
+                reader.onerror = function() {
+                    console.error('[Base Images] Read failed:', file.name, reader.error);
+                    readResults.push({
+                        file: file,
+                        valid: false,
+                        error: reader.error,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        handleBaseImageReadResults(readResults);
+                    }
+                };
+
+                // Start reading IMMEDIATELY
+                reader.readAsDataURL(file);
+            });
         });
     }
 
@@ -733,25 +809,52 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.dataTransfer.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
-            for (var i = 0; i < files.length; i++) {
-                var file = files[i];
-                if (!isValidImageFile(file)) {
-                    alert('Invalid file type: ' + file.name + '. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC/HEIF');
-                    continue;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB: ' + file.name);
-                    continue;
-                }
-                validFiles.push(file);
-            }
+            console.log('[Base Images Drop] Files dropped:', files.length);
 
-            if (validFiles.length === 0) return;
+            // ULTRA-CRITICAL: Start reading ALL files IMMEDIATELY
+            var readResults = [];
+            var readersCompleted = 0;
 
-            // Process files and create previews
-            processBaseImageFiles(validFiles);
+            files.forEach(function(file, index) {
+                var reader = new FileReader();
+
+                reader.onload = function(readerEvent) {
+                    var dataUrl = readerEvent.target.result;
+
+                    // Validate AFTER reading
+                    var isValid = isValidImageFile(file);
+                    var isSizeOk = file.size <= 5 * 1024 * 1024;
+
+                    readResults.push({
+                        file: file,
+                        dataUrl: dataUrl,
+                        valid: isValid && isSizeOk,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        handleBaseImageReadResults(readResults);
+                    }
+                };
+
+                reader.onerror = function() {
+                    readResults.push({
+                        file: file,
+                        valid: false,
+                        error: reader.error,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        handleBaseImageReadResults(readResults);
+                    }
+                };
+
+                // Start reading IMMEDIATELY
+                reader.readAsDataURL(file);
+            });
         });
     }
 
