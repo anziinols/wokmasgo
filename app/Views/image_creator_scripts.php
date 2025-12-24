@@ -87,6 +87,28 @@ function isHeicFile(file) {
 }
 
 /**
+ * Infer MIME type from file extension (Android Chrome fix)
+ * Android often provides files with empty MIME types from content:// URIs
+ */
+function inferMimeType(fileName) {
+    if (!fileName) return null;
+
+    var ext = fileName.toLowerCase().split('.').pop();
+    var mimeMap = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'avif': 'image/avif',
+        'heic': 'image/heic',
+        'heif': 'image/heif'
+    };
+
+    return mimeMap[ext] || null;
+}
+
+/**
  * Create a preview data URL for image
  * Uses FileReader for better mobile compatibility
  * Converts HEIC to JPEG for browser display
@@ -131,25 +153,59 @@ function createPreviewUrl(file) {
                     resolve({ dataUrl: e.target.result, file: convertedFile });
                 };
                 reader.onerror = function() {
-                    reject(new Error('Failed to read converted HEIC file'));
+                    console.error('[createPreviewUrl] FileReader error after HEIC conversion:', reader.error);
+                    reject(new Error('Failed to read converted HEIC file: ' + (reader.error ? reader.error.message : 'Unknown error')));
                 };
-                reader.readAsDataURL(convertedBlob);
+                try {
+                    reader.readAsDataURL(convertedBlob);
+                } catch (e) {
+                    console.error('[createPreviewUrl] Exception reading HEIC blob:', e);
+                    reject(new Error('Failed to read converted HEIC: ' + e.message));
+                }
             }).catch(function(err) {
                 console.error('[createPreviewUrl] HEIC conversion failed:', err);
-                reject(err);
+                reject(new Error('HEIC conversion failed: ' + (err.message || err)));
             });
         } else {
             // Standard image - read directly as data URL
+            // Android Chrome fix: ensure file has MIME type
+            var processedFile = file;
+
+            // If file.type is empty (common on Android), infer from extension
+            if (!file.type || file.type === '') {
+                console.warn('[createPreviewUrl] File has no MIME type, inferring from extension');
+                var mimeType = inferMimeType(file.name);
+                if (mimeType) {
+                    try {
+                        // Create a new File with proper MIME type
+                        processedFile = new File([file], file.name, { type: mimeType });
+                        console.log('[createPreviewUrl] Created new file with MIME type:', mimeType);
+                    } catch (e) {
+                        console.warn('[createPreviewUrl] Could not create new File, using original');
+                        processedFile = file;
+                    }
+                }
+            }
+
             var reader = new FileReader();
             reader.onload = function(e) {
                 console.log('[createPreviewUrl] File read successfully');
-                resolve({ dataUrl: e.target.result, file: file });
+                resolve({ dataUrl: e.target.result, file: processedFile });
             };
-            reader.onerror = function() {
-                console.error('[createPreviewUrl] FileReader error');
-                reject(new Error('Failed to read file'));
+            reader.onerror = function(err) {
+                console.error('[createPreviewUrl] FileReader error:', reader.error);
+                console.error('[createPreviewUrl] Error name:', reader.error ? reader.error.name : 'unknown');
+                console.error('[createPreviewUrl] Error message:', reader.error ? reader.error.message : 'unknown');
+                reject(new Error('Failed to read file: ' + (reader.error ? reader.error.message : 'Unknown FileReader error')));
             };
-            reader.readAsDataURL(file);
+
+            // Android Chrome: Read the file immediately
+            try {
+                reader.readAsDataURL(processedFile);
+            } catch (e) {
+                console.error('[createPreviewUrl] Exception calling readAsDataURL:', e);
+                reject(new Error('Failed to start reading file: ' + e.message));
+            }
         }
     });
 }
