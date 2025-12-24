@@ -168,29 +168,20 @@ function createPreviewUrl(file) {
             });
         } else {
             // Standard image - read directly as data URL
-            // Android Chrome fix: ensure file has MIME type
-            var processedFile = file;
+            // Android Chrome: Read ORIGINAL file directly without modification
+            // Creating new File() breaks content:// URI references on Android
 
-            // If file.type is empty (common on Android), infer from extension
             if (!file.type || file.type === '') {
-                console.warn('[createPreviewUrl] File has no MIME type, inferring from extension');
+                console.warn('[createPreviewUrl] File has no MIME type (common on Android content:// URIs)');
                 var mimeType = inferMimeType(file.name);
-                if (mimeType) {
-                    try {
-                        // Create a new File with proper MIME type
-                        processedFile = new File([file], file.name, { type: mimeType });
-                        console.log('[createPreviewUrl] Created new file with MIME type:', mimeType);
-                    } catch (e) {
-                        console.warn('[createPreviewUrl] Could not create new File, using original');
-                        processedFile = file;
-                    }
-                }
+                console.log('[createPreviewUrl] Inferred MIME type from extension:', mimeType);
             }
 
             var reader = new FileReader();
             reader.onload = function(e) {
                 console.log('[createPreviewUrl] File read successfully');
-                resolve({ dataUrl: e.target.result, file: processedFile });
+                // Return original file object - don't recreate it
+                resolve({ dataUrl: e.target.result, file: file });
             };
             reader.onerror = function(err) {
                 console.error('[createPreviewUrl] FileReader error:', reader.error);
@@ -199,9 +190,10 @@ function createPreviewUrl(file) {
                 reject(new Error('Failed to read file: ' + (reader.error ? reader.error.message : 'Unknown FileReader error')));
             };
 
-            // Android Chrome: Read the file immediately
+            // Android Chrome: Read the ORIGINAL file immediately
+            // Do NOT create new File() as it breaks content:// URI access
             try {
-                reader.readAsDataURL(processedFile);
+                reader.readAsDataURL(file);
             } catch (e) {
                 console.error('[createPreviewUrl] Exception calling readAsDataURL:', e);
                 reject(new Error('Failed to start reading file: ' + e.message));
