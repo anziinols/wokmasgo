@@ -95,11 +95,15 @@ function isHeicFile(file) {
 function createPreviewUrl(file) {
     return new Promise(function(resolve, reject) {
         if (!file) {
+            console.error('[createPreviewUrl] No file provided');
             reject(new Error('No file provided'));
             return;
         }
 
+        // Detailed logging for debugging
+        console.log('[createPreviewUrl] File object:', file);
         console.log('[createPreviewUrl] Processing:', file.name, 'Type:', file.type, 'Size:', file.size);
+        console.log('[createPreviewUrl] File is valid:', file instanceof File || file instanceof Blob);
 
         // Check if HEIC file - needs conversion
         if (isHeicFile(file)) {
@@ -353,7 +357,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayTemplatePreview(result.dataUrl, result.file.name);
             }).catch(function(err) {
                 console.error('[Template Upload] Error:', err);
-                alert('Failed to process image. Please try another file.');
+                console.error('[Template Upload] Error details:', err.message, err.stack);
+                var errorMsg = err && err.message ? err.message : 'Unknown error';
+                alert('Failed to process image: ' + errorMsg + '\n\nPlease check the console (F12) for details or try another file.');
                 hideTemplateLoading();
             });
         });
@@ -398,7 +404,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayTemplatePreview(result.dataUrl, result.file.name);
             }).catch(function(err) {
                 console.error('[Template Drop] Error:', err);
-                alert('Failed to process image. Please try another file.');
+                console.error('[Template Drop] Error details:', err.message, err.stack);
+                var errorMsg = err && err.message ? err.message : 'Unknown error';
+                alert('Failed to process image: ' + errorMsg + '\n\nPlease check the console (F12) for details or try another file.');
                 hideTemplateLoading();
             });
         });
