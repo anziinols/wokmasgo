@@ -109,96 +109,89 @@ function inferMimeType(fileName) {
 }
 
 /**
- * Create a preview data URL for image
- * Uses FileReader for better mobile compatibility
- * Converts HEIC to JPEG for browser display
- * Returns a Promise that resolves to {dataUrl, file}
+ * Create preview for TEMPLATE upload (single file)
+ * Optimized for immediate reading on Android Chrome
  */
-function createPreviewUrl(file) {
+function createTemplatePreview(file) {
     return new Promise(function(resolve, reject) {
         if (!file) {
-            console.error('[createPreviewUrl] No file provided');
+            console.error('[createTemplatePreview] No file provided');
             reject(new Error('No file provided'));
             return;
         }
 
-        // Detailed logging for debugging
-        console.log('[createPreviewUrl] File object:', file);
-        console.log('[createPreviewUrl] Processing:', file.name, 'Type:', file.type, 'Size:', file.size);
-        console.log('[createPreviewUrl] File is valid:', file instanceof File || file instanceof Blob);
+        console.log('[createTemplatePreview] Processing:', file.name, 'Type:', file.type, 'Size:', file.size);
 
-        // Check if HEIC file - needs conversion
+        // Check if HEIC file
         if (isHeicFile(file)) {
-            console.log('[createPreviewUrl] HEIC file detected, converting to JPEG...');
-
+            console.log('[createTemplatePreview] HEIC file detected, converting...');
             if (typeof heic2any === 'undefined') {
-                console.error('[createPreviewUrl] heic2any library not loaded');
                 reject(new Error('HEIC conversion library not available'));
                 return;
             }
 
-            heic2any({
-                blob: file,
-                toType: 'image/jpeg',
-                quality: 0.8
-            }).then(function(convertedBlob) {
-                console.log('[createPreviewUrl] HEIC converted successfully');
-                // Read converted blob as data URL
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    // Create a new File from converted blob
-                    var convertedFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'), {
-                        type: 'image/jpeg'
-                    });
-                    resolve({ dataUrl: e.target.result, file: convertedFile });
-                };
-                reader.onerror = function() {
-                    console.error('[createPreviewUrl] FileReader error after HEIC conversion:', reader.error);
-                    reject(new Error('Failed to read converted HEIC file: ' + (reader.error ? reader.error.message : 'Unknown error')));
-                };
-                try {
+            heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 })
+                .then(function(convertedBlob) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        var convertedFile = new File([convertedBlob],
+                            file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'),
+                            { type: 'image/jpeg' });
+                        resolve({ dataUrl: e.target.result, file: convertedFile });
+                    };
+                    reader.onerror = function() {
+                        reject(new Error('Failed to read HEIC: ' + (reader.error ? reader.error.message : 'Unknown')));
+                    };
                     reader.readAsDataURL(convertedBlob);
-                } catch (e) {
-                    console.error('[createPreviewUrl] Exception reading HEIC blob:', e);
-                    reject(new Error('Failed to read converted HEIC: ' + e.message));
-                }
-            }).catch(function(err) {
-                console.error('[createPreviewUrl] HEIC conversion failed:', err);
-                reject(new Error('HEIC conversion failed: ' + (err.message || err)));
-            });
+                })
+                .catch(function(err) {
+                    reject(new Error('HEIC conversion failed: ' + (err.message || err)));
+                });
         } else {
-            // Standard image - read directly as data URL
-            // Android Chrome: Read ORIGINAL file directly without modification
-            // Creating new File() breaks content:// URI references on Android
-
-            if (!file.type || file.type === '') {
-                console.warn('[createPreviewUrl] File has no MIME type (common on Android content:// URIs)');
-                var mimeType = inferMimeType(file.name);
-                console.log('[createPreviewUrl] Inferred MIME type from extension:', mimeType);
-            }
-
+            // Standard image - read immediately
             var reader = new FileReader();
             reader.onload = function(e) {
-                console.log('[createPreviewUrl] File read successfully');
-                // Return original file object - don't recreate it
+                console.log('[createTemplatePreview] Read successfully');
                 resolve({ dataUrl: e.target.result, file: file });
             };
-            reader.onerror = function(err) {
-                console.error('[createPreviewUrl] FileReader error:', reader.error);
-                console.error('[createPreviewUrl] Error name:', reader.error ? reader.error.name : 'unknown');
-                console.error('[createPreviewUrl] Error message:', reader.error ? reader.error.message : 'unknown');
-                reject(new Error('Failed to read file: ' + (reader.error ? reader.error.message : 'Unknown FileReader error')));
+            reader.onerror = function() {
+                console.error('[createTemplatePreview] FileReader error:', reader.error);
+                reject(new Error('Failed to read: ' + (reader.error ? reader.error.message : 'Unknown')));
             };
-
-            // Android Chrome: Read the ORIGINAL file immediately
-            // Do NOT create new File() as it breaks content:// URI access
-            try {
-                reader.readAsDataURL(file);
-            } catch (e) {
-                console.error('[createPreviewUrl] Exception calling readAsDataURL:', e);
-                reject(new Error('Failed to start reading file: ' + e.message));
-            }
+            // Read original file immediately
+            reader.readAsDataURL(file);
         }
+    });
+}
+
+/**
+ * Create preview for PRODUCT/BASE images (multiple files)
+ * Simplified for Android - reads IMMEDIATELY, no validation delays
+ */
+function createProductPreview(file) {
+    return new Promise(function(resolve, reject) {
+        if (!file) {
+            reject(new Error('No file provided'));
+            return;
+        }
+
+        console.log('[createProductPreview] Processing:', file.name);
+
+        // Android Chrome: Start reading IMMEDIATELY - no delays
+        var reader = new FileReader();
+
+        reader.onload = function(e) {
+            console.log('[createProductPreview] Success:', file.name);
+            resolve({ dataUrl: e.target.result, file: file });
+        };
+
+        reader.onerror = function() {
+            console.error('[createProductPreview] Failed:', file.name, reader.error);
+            reject(new Error((reader.error ? reader.error.message : 'FileReader error') + ' (' + file.name + ')'));
+        };
+
+        // Read the file IMMEDIATELY - critical for Android
+        reader.readAsDataURL(file);
     });
 }
 
@@ -237,8 +230,9 @@ function processProductFiles(files) {
     var failedFiles = [];
 
     // Wrap each promise to handle individual failures
+    // Use createProductPreview (optimized for multiple files on Android)
     var promises = files.map(function(file) {
-        return createPreviewUrl(file)
+        return createProductPreview(file)
             .then(function(result) {
                 return { success: true, result: result, fileName: file.name };
             })
@@ -286,8 +280,9 @@ function processBaseImageFiles(files) {
     var failedFiles = [];
 
     // Wrap each promise to handle individual failures
+    // Use createProductPreview (optimized for multiple files on Android)
     var promises = files.map(function(file) {
-        return createPreviewUrl(file)
+        return createProductPreview(file)
             .then(function(result) {
                 return { success: true, result: result, fileName: file.name };
             })
@@ -452,8 +447,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show loading state
             showTemplateLoading();
 
-            // Create preview (handles HEIC conversion if needed)
-            createPreviewUrl(file).then(function(result) {
+            // Create preview using dedicated template function
+            createTemplatePreview(file).then(function(result) {
                 templateFile = result.file;
                 templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
                 displayTemplatePreview(result.dataUrl, result.file.name);
@@ -461,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('[Template Upload] Error:', err);
                 console.error('[Template Upload] Error details:', err.message, err.stack);
                 var errorMsg = err && err.message ? err.message : 'Unknown error';
-                alert('Failed to process image: ' + errorMsg + '\n\nPlease check the console (F12) for details or try another file.');
+                alert('Failed to process template: ' + errorMsg + '\n\nPlease check console (F12) for details.');
                 hideTemplateLoading();
             });
         });
@@ -499,8 +494,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show loading state
             showTemplateLoading();
 
-            // Create preview (handles HEIC conversion if needed)
-            createPreviewUrl(file).then(function(result) {
+            // Create preview using dedicated template function
+            createTemplatePreview(file).then(function(result) {
                 templateFile = result.file;
                 templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
                 displayTemplatePreview(result.dataUrl, result.file.name);
@@ -508,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('[Template Drop] Error:', err);
                 console.error('[Template Drop] Error details:', err.message, err.stack);
                 var errorMsg = err && err.message ? err.message : 'Unknown error';
-                alert('Failed to process image: ' + errorMsg + '\n\nPlease check the console (F12) for details or try another file.');
+                alert('Failed to process template: ' + errorMsg + '\n\nPlease check console (F12) for details.');
                 hideTemplateLoading();
             });
         });
