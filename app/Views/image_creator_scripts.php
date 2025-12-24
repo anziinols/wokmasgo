@@ -235,45 +235,99 @@ function hideTemplateLoading() {
 
 /**
  * Process multiple product files and create previews
+ * Uses individual promise handling to allow partial success (some files work, others fail)
  */
 function processProductFiles(files) {
     console.log('[processProductFiles] Processing', files.length, 'files');
 
+    var successCount = 0;
+    var failCount = 0;
+    var failedFiles = [];
+
+    // Wrap each promise to handle individual failures
     var promises = files.map(function(file) {
-        return createPreviewUrl(file);
+        return createPreviewUrl(file)
+            .then(function(result) {
+                return { success: true, result: result, fileName: file.name };
+            })
+            .catch(function(err) {
+                console.error('[processProductFiles] Failed to process:', file.name, err);
+                return { success: false, error: err, fileName: file.name };
+            });
     });
 
     Promise.all(promises).then(function(results) {
-        results.forEach(function(result) {
-            productFiles.push(result.file);
-            productPreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        results.forEach(function(item) {
+            if (item.success) {
+                productFiles.push(item.result.file);
+                productPreviews.push({ file: item.result.file, dataUrl: item.result.dataUrl });
+                successCount++;
+            } else {
+                failCount++;
+                failedFiles.push(item.fileName);
+            }
         });
+
         displayProductPreviews();
-    }).catch(function(err) {
-        console.error('[processProductFiles] Error:', err);
-        alert('Failed to process one or more images.');
+
+        // Show summary message
+        if (failCount > 0) {
+            var errorMsg = 'Successfully processed ' + successCount + ' of ' + files.length + ' images.\n\n';
+            errorMsg += 'Failed files:\n' + failedFiles.join('\n');
+            errorMsg += '\n\nPlease check the console (F12) for details.';
+            alert(errorMsg);
+        } else {
+            console.log('[processProductFiles] Successfully processed all', successCount, 'images');
+        }
     });
 }
 
 /**
  * Process multiple base image files and create previews
+ * Uses individual promise handling to allow partial success (some files work, others fail)
  */
 function processBaseImageFiles(files) {
     console.log('[processBaseImageFiles] Processing', files.length, 'files');
 
+    var successCount = 0;
+    var failCount = 0;
+    var failedFiles = [];
+
+    // Wrap each promise to handle individual failures
     var promises = files.map(function(file) {
-        return createPreviewUrl(file);
+        return createPreviewUrl(file)
+            .then(function(result) {
+                return { success: true, result: result, fileName: file.name };
+            })
+            .catch(function(err) {
+                console.error('[processBaseImageFiles] Failed to process:', file.name, err);
+                return { success: false, error: err, fileName: file.name };
+            });
     });
 
     Promise.all(promises).then(function(results) {
-        results.forEach(function(result) {
-            baseImageFiles.push(result.file);
-            baseImagePreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        results.forEach(function(item) {
+            if (item.success) {
+                baseImageFiles.push(item.result.file);
+                baseImagePreviews.push({ file: item.result.file, dataUrl: item.result.dataUrl });
+                successCount++;
+            } else {
+                failCount++;
+                failedFiles.push(item.fileName);
+            }
         });
+
         displayBaseImagePreviews();
-    }).catch(function(err) {
-        console.error('[processBaseImageFiles] Error:', err);
-        alert('Failed to process one or more images.');
+
+        // Show summary message
+        if (failCount > 0) {
+            var errorMsg = 'Successfully processed ' + successCount + ' of ' + files.length + ' images.\n\n';
+            errorMsg += 'Failed files:\n' + failedFiles.join('\n');
+            errorMsg += '\n\nPlease check the console (F12) for details.';
+            alert(errorMsg);
+        } else {
+            console.log('[processBaseImageFiles] Successfully processed all', successCount, 'images');
+        }
     });
 }
 
