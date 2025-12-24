@@ -325,6 +325,9 @@ a .image-type-card {
     cursor: pointer;
     transition: all 0.3s ease;
     flex-shrink: 0;
+    position: relative;
+    z-index: 11; /* Above the overlay input for clickability */
+    pointer-events: auto; /* Ensure this button can be clicked */
 }
 
 .add-more-images-btn:hover {
@@ -546,17 +549,16 @@ a .image-type-card {
     border: 3px solid var(--maroon);
 }
 
-/* Mobile file input styling - ensures proper visibility and touch targets */
+/* Mobile file input styling - overlay approach for better mobile compatibility */
 .mobile-file-input {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
 }
 
 /* Upload label styling for mobile */
@@ -568,6 +570,14 @@ a .image-type-card {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    pointer-events: none; /* Allow clicks to pass through to the overlay input */
+    position: relative;
+    z-index: 1;
+}
+
+/* Re-enable pointer events for label text and icons for better UX */
+.upload-label * {
+    pointer-events: none;
 }
 
 /* Responsive */
