@@ -470,50 +470,48 @@ document.addEventListener('DOMContentLoaded', function() {
             var file = e.target.files[0];
             if (!file) return;
 
-            console.log('[Template] File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
-
-            // CRITICAL: Start reading IMMEDIATELY - NO validation delays
-            // Android Chrome requires FileReader to start synchronously in event handler
-            showTemplateLoading();
-
-            // Start FileReader immediately
+            // ULTRA-CRITICAL FOR ANDROID CHROME:
+            // Start FileReader IMMEDIATELY as FIRST statement
+            // ANY operation before this (even console.log) can cause permission loss
             var reader = new FileReader();
 
+            // Set handlers BEFORE starting read
             reader.onload = function(readerEvent) {
                 var dataUrl = readerEvent.target.result;
-                console.log('[Template] Read successful:', file.name);
 
-                // Validate AFTER reading (now we have the data)
+                // NOW we can do UI updates and validation
+                console.log('[Template] Read successful');
+
+                // Validate AFTER reading
                 if (!isValidImageFile(file)) {
                     alert('Invalid file type. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC');
-                    hideTemplateLoading();
                     e.target.value = '';
                     return;
                 }
 
                 if (file.size > 5 * 1024 * 1024) {
                     alert('File size must be less than 5MB');
-                    hideTemplateLoading();
                     e.target.value = '';
                     return;
                 }
 
-                // Store results
+                // Store and display
                 templateFile = file;
                 templateDataUrl = dataUrl;
                 displayTemplatePreview(dataUrl, file.name);
             };
 
             reader.onerror = function() {
-                console.error('[Template] FileReader failed:', reader.error);
-                var errorMsg = reader.error ? reader.error.message : 'Failed to read file';
-                alert('Failed to read template: ' + errorMsg);
-                hideTemplateLoading();
+                console.error('[Template] Read failed:', reader.error);
+                alert('Failed to read file: ' + (reader.error ? reader.error.message : 'Unknown error'));
                 e.target.value = '';
             };
 
-            // Start reading IMMEDIATELY - critical for Android
+            // Start reading NOW - must be within first few ms of event handler
             reader.readAsDataURL(file);
+
+            // UI update AFTER starting read
+            showTemplateLoading();
         });
     }
 
@@ -536,31 +534,40 @@ document.addEventListener('DOMContentLoaded', function() {
             var file = e.dataTransfer.files[0];
             if (!file) return;
 
-            if (!isValidImageFile(file)) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF, HEIC/HEIF)');
-                return;
-            }
+            // ULTRA-CRITICAL: Start reading IMMEDIATELY
+            var reader = new FileReader();
 
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
-                return;
-            }
+            reader.onload = function(readerEvent) {
+                var dataUrl = readerEvent.target.result;
+                console.log('[Template Drop] Read successful');
 
-            // Show loading state
+                // Validate AFTER reading
+                if (!isValidImageFile(file)) {
+                    alert('Invalid file type. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC');
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB');
+                    return;
+                }
+
+                // Store and display
+                templateFile = file;
+                templateDataUrl = dataUrl;
+                displayTemplatePreview(dataUrl, file.name);
+            };
+
+            reader.onerror = function() {
+                console.error('[Template Drop] Read failed:', reader.error);
+                alert('Failed to read file: ' + (reader.error ? reader.error.message : 'Unknown error'));
+            };
+
+            // Start reading IMMEDIATELY
+            reader.readAsDataURL(file);
+
+            // UI update AFTER
             showTemplateLoading();
-
-            // Create preview using dedicated template function
-            createTemplatePreview(file).then(function(result) {
-                templateFile = result.file;
-                templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
-                displayTemplatePreview(result.dataUrl, result.file.name);
-            }).catch(function(err) {
-                console.error('[Template Drop] Error:', err);
-                console.error('[Template Drop] Error details:', err.message, err.stack);
-                var errorMsg = err && err.message ? err.message : 'Unknown error';
-                alert('Failed to process template: ' + errorMsg + '\n\nPlease check console (F12) for details.');
-                hideTemplateLoading();
-            });
         });
     }
 
