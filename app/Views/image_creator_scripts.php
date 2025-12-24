@@ -219,8 +219,46 @@ function hideTemplateLoading() {
 }
 
 /**
+ * Handle product image read results (called after all files are read)
+ */
+function handleProductReadResults(results) {
+    console.log('[handleProductReadResults] Processing', results.length, 'results');
+
+    var validResults = [];
+    var invalidResults = [];
+
+    results.forEach(function(result) {
+        if (result.valid && result.dataUrl) {
+            validResults.push(result);
+            productFiles.push(result.file);
+            productPreviews.push({ file: result.file, dataUrl: result.dataUrl });
+        } else {
+            invalidResults.push(result);
+        }
+    });
+
+    // Display valid images
+    if (validResults.length > 0) {
+        displayProductPreviews();
+    }
+
+    // Show summary
+    if (invalidResults.length > 0) {
+        var msg = 'Processed ' + validResults.length + ' of ' + results.length + ' images.\n\n';
+        msg += 'Skipped files:\n';
+        invalidResults.forEach(function(r) {
+            var reason = r.error ? 'Read error' : 'Invalid type or too large';
+            msg += '- ' + r.file.name + ' (' + reason + ')\n';
+        });
+        alert(msg);
+    } else {
+        console.log('[handleProductReadResults] All', validResults.length, 'images processed successfully');
+    }
+}
+
+/**
  * Process multiple product files and create previews
- * Uses individual promise handling to allow partial success (some files work, others fail)
+ * DEPRECATED: Now using immediate read in event handler
  */
 function processProductFiles(files) {
     console.log('[processProductFiles] Processing', files.length, 'files');
@@ -432,33 +470,50 @@ document.addEventListener('DOMContentLoaded', function() {
             var file = e.target.files[0];
             if (!file) return;
 
-            if (!isValidImageFile(file)) {
-                alert('Please upload a valid image file (JPG, PNG, GIF, WEBP, AVIF, HEIC/HEIF)');
-                e.target.value = '';
-                return;
-            }
+            console.log('[Template] File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
 
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File size must be less than 5MB');
-                e.target.value = '';
-                return;
-            }
-
-            // Show loading state
+            // CRITICAL: Start reading IMMEDIATELY - NO validation delays
+            // Android Chrome requires FileReader to start synchronously in event handler
             showTemplateLoading();
 
-            // Create preview using dedicated template function
-            createTemplatePreview(file).then(function(result) {
-                templateFile = result.file;
-                templateDataUrl = result.dataUrl; // Store data URL to avoid stale File on mobile
-                displayTemplatePreview(result.dataUrl, result.file.name);
-            }).catch(function(err) {
-                console.error('[Template Upload] Error:', err);
-                console.error('[Template Upload] Error details:', err.message, err.stack);
-                var errorMsg = err && err.message ? err.message : 'Unknown error';
-                alert('Failed to process template: ' + errorMsg + '\n\nPlease check console (F12) for details.');
+            // Start FileReader immediately
+            var reader = new FileReader();
+
+            reader.onload = function(readerEvent) {
+                var dataUrl = readerEvent.target.result;
+                console.log('[Template] Read successful:', file.name);
+
+                // Validate AFTER reading (now we have the data)
+                if (!isValidImageFile(file)) {
+                    alert('Invalid file type. Please upload JPG, PNG, GIF, WEBP, AVIF, or HEIC');
+                    hideTemplateLoading();
+                    e.target.value = '';
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB');
+                    hideTemplateLoading();
+                    e.target.value = '';
+                    return;
+                }
+
+                // Store results
+                templateFile = file;
+                templateDataUrl = dataUrl;
+                displayTemplatePreview(dataUrl, file.name);
+            };
+
+            reader.onerror = function() {
+                console.error('[Template] FileReader failed:', reader.error);
+                var errorMsg = reader.error ? reader.error.message : 'Failed to read file';
+                alert('Failed to read template: ' + errorMsg);
                 hideTemplateLoading();
-            });
+                e.target.value = '';
+            };
+
+            // Start reading IMMEDIATELY - critical for Android
+            reader.readAsDataURL(file);
         });
     }
 
@@ -518,25 +573,65 @@ document.addEventListener('DOMContentLoaded', function() {
             var files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            // Validate files first
-            var validFiles = [];
-            for (var i = 0; i < files.length; i++) {
-                var file = files[i];
-                if (!isValidImageFile(file)) {
-                    alert('Invalid file type: ' + file.name);
-                    continue;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB: ' + file.name);
-                    continue;
-                }
-                validFiles.push(file);
-            }
+            console.log('[Product] Files selected:', files.length);
 
-            if (validFiles.length === 0) return;
+            // CRITICAL: Start reading ALL files IMMEDIATELY - NO validation delays
+            // Android Chrome requires all FileReaders to start synchronously in event handler
+            var readResults = [];
+            var readersCompleted = 0;
 
-            // Process files and create previews
-            processProductFiles(validFiles);
+            files.forEach(function(file, index) {
+                console.log('[Product] Starting read for:', file.name);
+
+                var reader = new FileReader();
+
+                reader.onload = function(readerEvent) {
+                    var dataUrl = readerEvent.target.result;
+                    console.log('[Product] Read successful:', file.name);
+
+                    // Validate AFTER reading
+                    var isValid = isValidImageFile(file);
+                    var isSizeOk = file.size <= 5 * 1024 * 1024;
+
+                    if (!isValid) {
+                        console.warn('[Product] Invalid type:', file.name);
+                    }
+                    if (!isSizeOk) {
+                        console.warn('[Product] Too large:', file.name);
+                    }
+
+                    readResults.push({
+                        file: file,
+                        dataUrl: dataUrl,
+                        valid: isValid && isSizeOk,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        // All files read, now process results
+                        handleProductReadResults(readResults);
+                    }
+                };
+
+                reader.onerror = function() {
+                    console.error('[Product] Read failed:', file.name, reader.error);
+                    readResults.push({
+                        file: file,
+                        valid: false,
+                        error: reader.error,
+                        index: index
+                    });
+
+                    readersCompleted++;
+                    if (readersCompleted === files.length) {
+                        handleProductReadResults(readResults);
+                    }
+                };
+
+                // Start reading IMMEDIATELY - critical for Android
+                reader.readAsDataURL(file);
+            });
         });
     }
 
