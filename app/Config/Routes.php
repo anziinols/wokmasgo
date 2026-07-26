@@ -21,6 +21,14 @@ $routes->get('image-creator/flyer/create', 'ImageCreator::flyerCreate');
 $routes->get('image-creator/flyer/edit', 'ImageCreator::flyerEdit');
 $routes->post('image-creator/generate', 'ImageCreator::generate');
 
+// Nolsai AI Chat routes
+$routes->get('nolsai', 'Nolsai::index');
+$routes->post('nolsai/save-config', 'Nolsai::saveConfig');
+$routes->post('nolsai/load-config', 'Nolsai::loadConfig');
+$routes->post('nolsai/test-connection', 'Nolsai::testConnection');
+$routes->post('nolsai/chat', 'Nolsai::chat');
+$routes->get('nolsai/visitors', 'Nolsai::visitors');
+
 // Future app routes (uncomment when ready to use)
 // $routes->get('dashboard', 'Dashboard::index');
 // $routes->get('users', 'Users::index');

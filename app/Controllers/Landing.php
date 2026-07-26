@@ -61,6 +61,15 @@ class Landing extends BaseController
                 'color' => 'gold',
                 'gradient' => 'gradient-gold-maroon'
             ],
+            [
+                'id' => 3,
+                'name' => 'Nolsai',
+                'description' => 'AI-powered chat assistant with API configuration and streaming',
+                'icon' => 'fas fa-comment-dots',
+                'url' => base_url('nolsai'),
+                'color' => 'maroon',
+                'gradient' => 'gradient-maroon-gold'
+            ],
         ];
     }
 }
