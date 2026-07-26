@@ -124,3 +124,16 @@ _modules/*
 
 /results/
 /phpunit*.xml
+
+#-------------------------
+# Uploads & Runtime Data
+#-------------------------
+public/uploads/*
+!public/uploads/index.html
+
+# Firebase debug logs
+firebase-debug.log
+firebase-debug.*.log
+
+# Windows NUL device artifact
+nul
